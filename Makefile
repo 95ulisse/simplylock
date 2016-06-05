@@ -3,6 +3,7 @@ CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L
 LDFLAGS =
 
 OBJECTS = vt.o \
+		  options.o \
 		  main.o
 
 %.o: %.cr

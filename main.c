@@ -1,42 +1,31 @@
 #include <stdio.h>
-#include <assert.h>
 #include <unistd.h>
+#include <stdlib.h>
 
+#include "options.h"
 #include "vt.h"
 
-int main() {
+int main(int argc, char** argv) {
 
-    if (vt_init() < 0)
-        perror("vt_init");
-
-    struct vt* curr = vt_getcurrent();
-
-    struct vt* vt = vt_createnew();
-    if (vt == NULL)
-        perror("vt_createnew");
-
-    if (vt_switch(vt) < 0)
-        perror("vt_switch");
-
-    vt_lockswitch(1);
-    vt_setecho(vt, 1);
-
-    fwrite("Switching locked\n", 4, 1, vt->stream);
-
-    for (int i = 10; i >= 0; i--) {
-        vt_clear(vt);
-        dprintf(vt->fd, "[ %d ] %d\n", vt->number, i);
-        sleep(1);
+    // Parses the options
+    struct options* options = options_parse(argc, argv);
+    if (options == NULL) {
+        exit(1);
+    }
+    if (options->show_help || options->show_version) {
+        free(options);
+        exit(0);
     }
 
-    vt_lockswitch(0);
+    fprintf(stdout, "%d %d %s %s %d\n",
+        options->block_sysrequests,
+        options->block_vt_switch,
+        options->user,
+        options->message,
+        options->show_help
+    );
 
-    vt_switch(curr);
-
-    vt_free(vt);
-    vt_free(curr);
-
-    vt_end();
+    free(options);
 
     return 0;
 }

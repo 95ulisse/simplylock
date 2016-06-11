@@ -1,9 +1,10 @@
 CC = gcc
 CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L
-LDFLAGS =
+LDFLAGS = -lpam -lpam_misc
 
 OBJECTS = vt.o \
 		  options.o \
+		  auth.o \
 		  main.o
 
 %.o: %.cr

@@ -5,6 +5,7 @@ LDFLAGS = -lpam -lpam_misc
 OBJECTS = vt.o \
 		  options.o \
 		  auth.o \
+		  lock.o \
 		  main.o
 
 %.o: %.cr

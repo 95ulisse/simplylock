@@ -32,7 +32,7 @@
         } \
     } while (0)
 
-static int user_selection_enabled;
+static int user_selection_enabled = 0;
 static sigjmp_buf user_selection_jmp;
 
 static void on_sigint(int sig) {
@@ -111,6 +111,16 @@ int main(int argc, char** argv) {
     }
     user = options->users[0];
 
+    // Now we become fully root, in case we were started as setuid from another user
+    if (setregid(0, 0) < 0) {
+        perror("setregid");
+        return 1;
+    }
+    if (setreuid(0, 0) < 0) {
+        perror("setreuid");
+        return 1;
+    }
+
     // Register signal handler for SIGINT
     if (register_signal(SIGINT, on_sigint) < 0) {
         perror("register_signal SIGINT");
@@ -131,9 +141,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Now we move to a new session so that we can be the
+    // Now we fork and move to a new session so that we can be the
     // foreground process for the new terminal to be created
-    setsid();
+    if (fork() == 0) {
+        setsid();
+    } else {
+        goto clean_and_exit;
+    }
 
     // Initialize VT library
     if (vt_init() < 0) {
@@ -202,9 +216,11 @@ int main(int argc, char** argv) {
         sleep(3);
     }
 
+    vt_clear(vt);
     unlock(options);
 
     // Cleanup
+clean_and_exit:
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);

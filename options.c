@@ -111,8 +111,9 @@ struct options* options_parse(int argc, char** argv) {
     options->block_vt_switch = 1;
     options->block_kernel_messages = 1;
     options->users = NULL;
-    options->message = "Press enter to unlock.";
+    options->message = NULL;
     options->show_help = 0;
+    options->show_version = 0;
 
     // Args parsing
     int opt;

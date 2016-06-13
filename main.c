@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+#include <errno.h>
+#include <setjmp.h>
 
 #include "options.h"
 #include "vt.h"
@@ -25,7 +29,63 @@
         } \
     } while (0)
 
+static int user_selection_enabled;
+static sigjmp_buf user_selection_jmp;
+
+static void on_sigint(int sig) {
+    if (user_selection_enabled) {
+        siglongjmp(user_selection_jmp, 1);
+    }
+}
+
+static inline int register_signal(int sig, void (*handler)(int)) {
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = handler;
+    return sigaction(sig, &action, NULL);
+}
+
+static int user_selection(struct options* options, struct vt* vt, char** user) {
+    int index;
+    do {
+
+        vt_flush(vt);
+        vt_clear(vt);
+
+        fprintf(stdout, "\nThe following users are authorized to unlock:\n\n");
+        for (int i = 0; i < options->users_size; i++) {
+            fprintf(stdout, "%d. %s\n", i + 1, options->users[i]);
+        }
+        fprintf(stdout, "\nInsert the number of the user that wants to unlock and press enter: ");
+
+        char* line = NULL;
+        size_t n = 0;
+        vt_setecho(vt, 1);
+        if (getline(&line, &n, vt->stream) < 0) {
+            return -1;
+        }
+        vt_setecho(vt, 0);
+
+        char* tmp;
+        index = strtol(line, &tmp, 10);
+        if (*tmp != '\n') {
+            index = -1;
+        } else {
+            index--;
+        }
+
+    } while (index < 0 || index >= options->users_size);
+
+    *user = options->users[index];
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    struct options* options;
+    struct vt* vt;
+    char* user;
+    int c;
 
     // We need to run as root or setuid root
     if (geteuid() != 0) {
@@ -34,7 +94,7 @@ int main(int argc, char** argv) {
     }
 
     // Parses the options
-    struct options* options = options_parse(argc, argv);
+    options = options_parse(argc, argv);
     if (options == NULL) {
         return 1;
     }
@@ -42,6 +102,31 @@ int main(int argc, char** argv) {
         options_free(options);
         return 0;
     }
+    user = options->users[0];
+
+    // Register signal handler for SIGINT
+    if (register_signal(SIGINT, on_sigint) < 0) {
+        perror("register_signal SIGINT");
+        return 1;
+    }
+
+    // Ignore all other termination signals
+    if (register_signal(SIGQUIT, SIG_IGN) < 0) {
+        perror("register_signal SIGQUIT");
+        return 1;
+    }
+    if (register_signal(SIGTERM, SIG_IGN) < 0) {
+        perror("register_signal SIGTERM");
+        return 1;
+    }
+    if (register_signal(SIGTSTP, SIG_IGN) < 0) {
+        perror("register_signal SIGTSTP");
+        return 1;
+    }
+
+    // Now we move to a new session so that we can be the
+    // foreground process for the new terminal to be created
+    setsid();
 
     // Initialize VT library
     if (vt_init() < 0) {
@@ -49,9 +134,15 @@ int main(int argc, char** argv) {
         goto error;
     }
 
-    // Here we go!
-    struct vt* vt = lock(options);
+    // Locking of the terminal
+    vt = lock(options);
     if (vt == NULL) {
+        goto error;
+    }
+
+    // Enable Ctrl+C on the terminal
+    if (vt_signals(vt, VT_SIGINT) < 0) {
+        perror("vt_signals");
         goto error;
     }
 
@@ -60,20 +151,31 @@ int main(int argc, char** argv) {
     REDIRECT_STD_STREAM(stdout, STDOUT_FILENO, "w");
     REDIRECT_STD_STREAM(stderr, STDERR_FILENO, "w");
 
-    // Disable buffering on stdout and stderr since this might cause problems with PAM stdio
+    // Disable buffering on std streams since this might cause problems with PAM stdio
+    setbuf(stdin, NULL);
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
     // We clear the environment to avoid any possible interaction with PAM modules
     clearenv();
 
+    // User selection: this code will be executed only when the user presses Ctrl+C
+    if (sigsetjmp(user_selection_jmp, 1) > 0) {
+        user_selection(options, vt, &user);
+    }
+
     // The auth loop
-    char* user = options->users[0];
     for (;;) {
         vt_clear(vt);
         vt_flush(vt);
-        fprintf(stdout, "\n%s ", options->message);
-        int c = fgetc(stdin);
+
+        if (options->message != NULL) {
+            fprintf(stdout, "\n%s\n", options->message);
+        }
+        fprintf(stdout, "\nPress enter to unlock as %s. [Press Ctrl+C to change user] ", user);
+
+        user_selection_enabled = 1;
+        c = fgetc(stdin);
         while (c != EOF && c != '\n') {
             c = fgetc(stdin);
         }
@@ -82,10 +184,13 @@ int main(int argc, char** argv) {
             goto error;
         }
         fprintf(stdout, "\n");
+        user_selection_enabled = 0;
+
         if (auth_authenticate_user(user) == 0) {
             // The user is authenticated, so we can unlock everything
             break;
         }
+
         fprintf(stdout, "\nAuthentication failed.\n");
         sleep(3);
     }

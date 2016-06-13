@@ -30,6 +30,12 @@ struct vt {
     struct termios term;
 };
 
+typedef enum {
+    VT_SIGINT = 1 << 0,
+    VT_SIGQUIT = 1 << 1,
+    VT_SIGTSTP = 1 << 2
+} vt_signals_t;
+
 /**
  *    Initializes the vt library.
  *
@@ -101,5 +107,20 @@ int vt_flush(struct vt* vt);
  *    @return `0` in case of success, `-1` otherwise and sets `errno`.
  */
 int vt_clear(struct vt* vt);
+
+/**
+ *    Enables or disables signal generation from terminal.
+ *    Recognized signals:
+ *    - SIGINT
+ *    - SIGQUIT
+ *    - SIGTSTP
+ *
+ *    @param vt      Terminal to modify.
+ *    @param  sigs   Values from the `vt_signals_t` enumeration ORed together indicating which
+ *                   signals to activate. Any signal not included in the mask will be disabled.
+ *
+ *    @return        `0` if the operation completed successfully, `-1` otherwise.
+ */
+int vt_signals(struct vt* vt, vt_signals_t sigs);
 
 #endif

@@ -75,6 +75,7 @@ struct vt* vt_createnew() {
     }
 
     // By default we turn off echo and signal generation
+    vt->term.c_iflag |= IGNBRK;
     vt->term.c_lflag &= ~(ECHO | ISIG);
 	while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
     if (ret < 0) {
@@ -156,4 +157,32 @@ int vt_flush(struct vt* vt) {
 
 int vt_clear(struct vt* vt) {
     return write(vt->fd, "\033[H\033[J", 6) == 6 ? 0 : -1;
+}
+
+int vt_signals(struct vt* vt, vt_signals_t sigs) {
+
+    // Since we created the vt with signals disabled, we need to enable them
+    vt->term.c_lflag |= ISIG;
+
+    // Now we enable/disable the single signals
+    if ((sigs & VT_SIGINT) == 0) {
+        vt->term.c_cc[VINTR] = 0;
+    } else {
+        vt->term.c_cc[VINTR] = 3;
+    }
+    if ((sigs & VT_SIGQUIT) == 0) {
+        vt->term.c_cc[VQUIT] = 0;
+    } else {
+        vt->term.c_cc[VQUIT] = 34;
+    }
+    if ((sigs & VT_SIGTSTP) == 0) {
+        vt->term.c_cc[VSUSP] = 0;
+    } else {
+        vt->term.c_cc[VSUSP] = 32;
+    }
+
+    // And update the terminal
+    int ret;
+    while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
+    return ret;
 }

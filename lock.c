@@ -105,10 +105,21 @@ struct vt* lock(struct options* options) {
         return NULL;
     }
 
+    // Lock vt switching
+    if (vt_lockswitch(1) < 0) {
+        perror("vt_lockswitch");
+        return NULL;
+    }
+
     return vt;
 }
 
 void unlock(struct options* options) {
+
+    // Re-enable vt switching
+    if (vt_lockswitch(0) < 0) {
+        perror("vt_lockswitch");
+    }
 
     // We switch back to the old vt
     if (old_vt != NULL && vt_switch(old_vt) < 0) {

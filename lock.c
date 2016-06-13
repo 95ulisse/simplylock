@@ -87,6 +87,7 @@ struct vt* lock(struct options* options) {
             fprintf(stderr, "Please, consider running with -s to keep sysrequests enabled.\n");
             return NULL;
         }
+        fclose(sysrq_file);
         sysrq_blocked = 1;
     }
     if (options->block_kernel_messages) {
@@ -96,6 +97,7 @@ struct vt* lock(struct options* options) {
             fprintf(stderr, "Please, consider running with -k to keep kernel messages visible.\n");
             return NULL;
         }
+        fclose(printk_file);
         printk_blocked = 1;
     }
 
@@ -131,16 +133,22 @@ void unlock(struct options* options) {
 
     // And now we restore the state of sysrq/printk
     if (options->block_sysrequests && sysrq_blocked) {
-        rewind(sysrq_file);
-        if (fputs(old_sysrq, sysrq_file) < 0) {
+        sysrq_file = fopen(SYSRQ_PATH, "r+");
+        if (sysrq_file == NULL) {
+            perror("Open " SYSRQ_PATH);
+            fprintf(stderr, "Please, consider running with -s to keep sysrequests enabled.\n");
+        } else if (fputs(old_sysrq, sysrq_file) < 0) {
             perror("fputs " SYSRQ_PATH);
             fprintf(stderr, "Please, consider running with -s to keep sysrequests enabled.\n");
         }
         sysrq_blocked = 0;
     }
     if (options->block_kernel_messages && printk_blocked) {
-        rewind(printk_file);
-        if (fputs(old_printk, printk_file) < 0) {
+        printk_file = fopen(PRINTK_PATH, "r+");
+        if (printk_file == NULL) {
+            perror("Open " PRINTK_PATH);
+            fprintf(stderr, "Please, consider running with -k to keep kernel messages visible.\n");
+        } else if (fputs(old_printk, printk_file) < 0) {
             perror("fputs " PRINTK_PATH);
             fprintf(stderr, "Please, consider running with -k to keep kernel messages visible.\n");
         }

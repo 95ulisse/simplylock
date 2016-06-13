@@ -12,6 +12,9 @@
 #include "auth.h"
 #include "lock.h"
 
+#define HIGHLIGHT "\033[1m\033[34m"
+#define RESET "\033[0m"
+
 #define REDIRECT_STD_STREAM(s, f, mode) \
     do { \
         if (fclose(s) == EOF) { \
@@ -54,7 +57,11 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
 
         fprintf(stdout, "\nThe following users are authorized to unlock:\n\n");
         for (int i = 0; i < options->users_size; i++) {
-            fprintf(stdout, "%d. %s\n", i + 1, options->users[i]);
+            char* format = "%d. %s\n";
+            if (options->users[i] == *user) {
+                format = "%d. " HIGHLIGHT "%s" RESET "\n";
+            }
+            fprintf(stdout, format, i + 1, options->users[i]);
         }
         fprintf(stdout, "\nInsert the number of the user that wants to unlock and press enter: ");
 
@@ -172,7 +179,7 @@ int main(int argc, char** argv) {
         if (options->message != NULL) {
             fprintf(stdout, "\n%s\n", options->message);
         }
-        fprintf(stdout, "\nPress enter to unlock as %s. [Press Ctrl+C to change user] ", user);
+        fprintf(stdout, "\nPress enter to unlock as " HIGHLIGHT "%s" RESET ". [Press Ctrl+C to change user] ", user);
 
         user_selection_enabled = 1;
         c = fgetc(stdin);

@@ -74,9 +74,11 @@ struct vt* vt_createnew() {
         goto error;
     }
 
-    // By default we turn off echo and signal generation
+    // By default we turn off echo and signal generation.
+    // We also disable Ctrl+D for EOF, since we will almost never want it.
     vt->term.c_iflag |= IGNBRK;
     vt->term.c_lflag &= ~(ECHO | ISIG);
+    vt->term.c_cc[VEOF] = 0;
 	while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
     if (ret < 0) {
         goto error;

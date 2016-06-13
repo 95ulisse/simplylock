@@ -16,3 +16,8 @@ default: $(OBJECTS)
 
 clean:
 	rm *.o simplylock
+
+install: default
+	cp ./simplylock /bin/simplylock
+	chown root:root /bin/simplylock
+	chmod 4755 /bin/simplylock

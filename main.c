@@ -196,10 +196,16 @@ int main(int argc, char** argv) {
         fprintf(stdout, "\nPress enter to unlock as " HIGHLIGHT "%s" RESET ". [Press Ctrl+C to change user] ", user);
 
         user_selection_enabled = 1;
-        c = fgetc(stdin);
-        while (c != EOF && c != '\n') {
+
+        if (options->quick_unlock != 0) {
+            options->quick_unlock = 0;
+        } else {
             c = fgetc(stdin);
+            while (c != EOF && c != '\n') {
+                c = fgetc(stdin);
+            }
         }
+
         if (c == EOF) {
             perror("getchar");
             goto error;

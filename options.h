@@ -8,6 +8,7 @@ struct options {
     unsigned int block_sysrequests;
     unsigned int block_vt_switch;
     unsigned int block_kernel_messages;
+    unsigned int quick_unlock;
     char** users;
     unsigned int users_size;
     char* message;

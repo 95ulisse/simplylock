@@ -14,11 +14,12 @@ static char* root_username = "root";
 static void print_usage(int argc, char** argv) {
     fprintf(
         stderr,
-        "Usage: %s [-slkhv] [-u users] [-m message]\n"
+        "Usage: %s [-slkqhv] [-u users] [-m message]\n"
         "\n"
         "-s           Keep sysrequests enabled.\n"
         "-l           Do not lock terminal switching.\n"
         "-k           Do not mute kernel messages while the console is locked.\n"
+        "-q           Quick unlock mode.\n"
         "-u user      Comma separated list of users allowed to unlock.\n"
         "             Note that the root user will always be able to unlock.\n"
         "-m message   Display the given message instead of the default one.\n"
@@ -110,6 +111,7 @@ struct options* options_parse(int argc, char** argv) {
     options->block_sysrequests = 1;
     options->block_vt_switch = 1;
     options->block_kernel_messages = 1;
+    options->quick_unlock = 0;
     options->users = NULL;
     options->message = NULL;
     options->show_help = 0;
@@ -117,7 +119,7 @@ struct options* options_parse(int argc, char** argv) {
 
     // Args parsing
     int opt;
-    while ((opt = getopt(argc, argv, "slku:m:hv")) != -1) {
+    while ((opt = getopt(argc, argv, "slkqu:m:hv")) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -127,6 +129,9 @@ struct options* options_parse(int argc, char** argv) {
                 break;
             case 'k':
                 options->block_kernel_messages = 0;
+                break;
+            case 'q':
+                options->quick_unlock = 1;
                 break;
             case 'u':
                 if (split_users(options, optarg) < 0) {

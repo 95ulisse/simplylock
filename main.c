@@ -55,6 +55,8 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
         vt_flush(vt);
         vt_clear(vt);
 
+        if(options->backlight_off != 0) system("vbetool dpms on");
+
         fprintf(stdout, "\nThe following users are authorized to unlock:\n\n");
         for (int i = 0; i < options->users_size; i++) {
             char* format = "%d. %s\n";
@@ -88,11 +90,26 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
     return 0;
 }
 
+void turn_off_backlight(int *state) {
+    if(*state != 0) {
+        system("vbetool dpms off");
+        *state = 0;
+    }
+}
+void turn_on_backlight(int *state) {
+    if(*state != 1) {
+        system("vbetool dpms on");
+        *state = 1;
+    }
+}
+
 int main(int argc, char** argv) {
     struct options* options;
     struct vt* vt;
     char* user;
     int c;
+    uid_t original_uid;
+    int backlight_state;
 
     // We need to run as root or setuid root
     if (geteuid() != 0) {
@@ -100,18 +117,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Parses the options
-    options = options_parse(argc, argv);
-    if (options == NULL) {
-        return 1;
-    }
-    if (options->show_help || options->show_version) {
-        options_free(options);
-        return 0;
-    }
-    user = options->users[0];
-
     // Now we become fully root, in case we were started as setuid from another user
+    original_uid = getuid();
     if (setregid(0, 0) < 0) {
         perror("setregid");
         return 1;
@@ -120,6 +127,18 @@ int main(int argc, char** argv) {
         perror("setreuid");
         return 1;
     }
+
+    // Parses the options
+    options = options_parse(argc, argv, original_uid);
+    if (options == NULL) {
+        return 1;
+    }
+
+    if (options->show_help || options->show_version) {
+        options_free(options);
+        return 0;
+    }
+    user = options->users[0];
 
     // Register signal handler for SIGINT
     if (register_signal(SIGINT, on_sigint) < 0) {
@@ -177,6 +196,9 @@ int main(int argc, char** argv) {
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
 
+    backlight_state = 1;
+    if(options->backlight_off != 0) turn_off_backlight(&backlight_state);
+
     // We clear the environment to avoid any possible interaction with PAM modules
     clearenv();
 
@@ -203,6 +225,7 @@ int main(int argc, char** argv) {
             c = fgetc(stdin);
             while (c != EOF && c != '\n') {
                 c = fgetc(stdin);
+                if(options->backlight_off != 0) turn_on_backlight(&backlight_state);
             }
         }
 
@@ -210,7 +233,7 @@ int main(int argc, char** argv) {
             perror("getchar");
             goto error;
         }
-        fprintf(stdout, "\n");
+        putc('\n', stdout);
         user_selection_enabled = 0;
 
         if (auth_authenticate_user(user) == 0) {
@@ -218,9 +241,12 @@ int main(int argc, char** argv) {
             break;
         }
 
+        if(options->backlight_off != 0) turn_on_backlight(&backlight_state);
         fprintf(stdout, "\nAuthentication failed.\n");
         sleep(3);
     }
+
+    if(options->backlight_off != 0) turn_on_backlight(&backlight_state);
 
     vt_clear(vt);
     unlock(options);

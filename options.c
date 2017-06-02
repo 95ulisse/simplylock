@@ -14,12 +14,13 @@ static char* root_username = "root";
 static void print_usage(int argc, char** argv) {
     fprintf(
         stderr,
-        "Usage: %s [-slkqhv] [-u users] [-m message]\n"
+        "Usage: %s [-slkqdhv] [-u users] [-m message]\n"
         "\n"
         "-s           Keep sysrequests enabled.\n"
         "-l           Do not lock terminal switching.\n"
         "-k           Do not mute kernel messages while the console is locked.\n"
         "-q           Quick unlock mode.\n"
+        "-d           Turn off the backlight of the screen.\n"
         "-u user      Comma separated list of users allowed to unlock.\n"
         "             Note that the root user will always be able to unlock.\n"
         "-m message   Display the given message instead of the default one.\n"
@@ -32,6 +33,14 @@ static void print_usage(int argc, char** argv) {
 
 static void print_version() {
     printf("simplylock v" SIMPLYLOCK_VERSION "\n");
+}
+
+static void print_vbetool_dependency() {
+    fprintf(stderr, "You need vbetool to use -d option.\n");
+}
+
+static int check_vbetool_dependency() {
+    return system("vbetool dpms off > /dev/null 2>&1");
 }
 
 static char* trim(char* str, size_t len, size_t* outLen) {
@@ -99,7 +108,7 @@ static int split_users(struct options* options, char* users) {
     return 0;
 }
 
-struct options* options_parse(int argc, char** argv) {
+struct options* options_parse(int argc, char** argv, uid_t uid) {
 
     // Allocates the sturcture
     struct options* options = (struct options*)malloc(sizeof(struct options));
@@ -112,6 +121,7 @@ struct options* options_parse(int argc, char** argv) {
     options->block_vt_switch = 1;
     options->block_kernel_messages = 1;
     options->quick_unlock = 0;
+    options->backlight_off = 0;
     options->users = NULL;
     options->message = NULL;
     options->show_help = 0;
@@ -119,7 +129,7 @@ struct options* options_parse(int argc, char** argv) {
 
     // Args parsing
     int opt;
-    while ((opt = getopt(argc, argv, "slkqu:m:hv")) != -1) {
+    while ((opt = getopt(argc, argv, "slkqdu:m:hv")) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -132,6 +142,13 @@ struct options* options_parse(int argc, char** argv) {
                 break;
             case 'q':
                 options->quick_unlock = 1;
+                break;
+            case 'd':
+                if (check_vbetool_dependency() != 0) {
+                    print_vbetool_dependency();
+                    goto error;
+                }
+                options->backlight_off = 1;
                 break;
             case 'u':
                 if (split_users(options, optarg) < 0) {
@@ -157,7 +174,6 @@ struct options* options_parse(int argc, char** argv) {
 
     // If no user was manually provided, we use the user that started the application
     if (options->users == NULL) {
-        uid_t uid = getuid();
         if (uid != 0) {
             struct passwd* passwd = getpwuid(uid);
             if (passwd == NULL) {

@@ -1,23 +1,29 @@
 CC = gcc
 CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L
+INCLUDES = -I./src
 LDFLAGS += -lpam -lpam_misc
 
-OBJECTS = vt.o \
-		  options.o \
-		  auth.o \
-		  lock.o \
-		  main.o
+SRC = src
+OUT = out
 
-%.o: %.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+OBJECTS = $(OUT)/vt.o \
+		  $(OUT)/options.o \
+		  $(OUT)/auth.o \
+		  $(OUT)/lock.o \
+		  $(OUT)/main.o
+
+$(OUT)/%.o: $(SRC)/%.c
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 default: $(OBJECTS)
-	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o simplylock
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $(OUT)/simplylock $(OBJECTS) $(LDFLAGS)
 
 clean:
-	rm -f *.o simplylock || true
+	rm -rf $(OUT)
 
 install: default
-	cp ./simplylock /bin/simplylock
+	cp $(OUT)/simplylock /bin/simplylock
 	chown root:root /bin/simplylock
 	chmod 4755 /bin/simplylock

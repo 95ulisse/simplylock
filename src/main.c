@@ -94,12 +94,6 @@ int main(int argc, char** argv) {
     char* user;
     int c;
 
-    // We need to run as root or setuid root
-    if (geteuid() != 0) {
-        fprintf(stderr, "Please, run simplylock as root or setuid root.\n");
-        return 1;
-    }
-
     // Parses the options
     options = options_parse(argc, argv);
     if (options == NULL) {
@@ -110,6 +104,12 @@ int main(int argc, char** argv) {
         return 0;
     }
     user = options->users[0];
+
+    // We need to run as root or setuid root
+    if (geteuid() != 0) {
+        fprintf(stderr, "Please, run simplylock as root or setuid root.\n");
+        return 1;
+    }
 
     // Now we become fully root, in case we were started as setuid from another user
     if (setregid(0, 0) < 0) {

@@ -1,0 +1,9 @@
+language: c
+
+addons:
+  apt:
+    packages:
+    - libpam0g-dev
+
+script:
+  - make

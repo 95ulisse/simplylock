@@ -42,11 +42,11 @@ WantedBy=sleep.target
 ```
 
 Save this unit to `/etc/systemd/system/simplylock.service` and issue a `systemctl daemon-reload`
-to make sure that the changes are reloaded.
+to make sure that the changes are reloaded. Enable the unit with `systemctl enable simplylock`.
 
 Now, every time you suspend through `systemctl suspend`, when you resume, your pc will be locked.
 
-Note that if you use this exact unit, only root will be able to unlock at resume.
+Note that if you use this exact unit, **only root will be able to unlock at resume**.
 Use the `-u` option to list other users that can unlock.
 
 ## Installation

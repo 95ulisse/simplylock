@@ -4,12 +4,19 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <ctype.h>
+#include <shadow.h>
+#include <getopt.h>
 
 #include "options.h"
 
 #define SIMPLYLOCK_VERSION "0.1.0"
 
 static char* root_username = "root";
+
+static struct option long_options[] = {
+    { "allow-passwordless-root", no_argument, NULL, 'a' },
+    { 0, 0, 0, 0 }
+};
 
 static void print_usage(int argc, char** argv) {
     fprintf(
@@ -111,13 +118,14 @@ struct options* options_parse(int argc, char** argv) {
     options->block_vt_switch = 1;
     options->block_kernel_messages = 1;
     options->users = NULL;
+    options->allow_passwordless_root = 0;
     options->message = NULL;
     options->show_help = 0;
     options->show_version = 0;
 
     // Args parsing
     int opt;
-    while ((opt = getopt(argc, argv, "slku:m:hv")) != -1) {
+    while ((opt = getopt_long(argc, argv, "slku:m:hv", long_options, NULL)) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -132,6 +140,9 @@ struct options* options_parse(int argc, char** argv) {
                 if (split_users(options, optarg) < 0) {
                     goto error;
                 }
+                break;
+            case 'a':
+                options->allow_passwordless_root = 1;
                 break;
             case 'm':
                 options->message = optarg;
@@ -166,6 +177,28 @@ struct options* options_parse(int argc, char** argv) {
             options->users = (char**)malloc(sizeof(char*));
             options->users[0] = root_username;
             options->users_size = 1;
+        }
+    }
+
+    // Special check for the root user:
+    // If only root can unlock the pc, check that it has a password.
+    // Ubuntu, for example, has a passwordless root user by default.
+    if (options->users_size == 1 && memcmp(options->users[0], root_username, 5) == 0) {
+        struct spwd* shadow_entry = getspnam(root_username);
+        if (shadow_entry == NULL || shadow_entry->sp_pwdp == NULL) {
+            goto error;
+        }
+
+        // Check that a password exists for the root user and that it's not locked
+        char* pwd = shadow_entry->sp_pwdp;
+        if (strlen(pwd) == 0 || pwd[0] == '!' || pwd[0] == '*') {
+            if (!options->allow_passwordless_root) {
+                fprintf(stderr,
+                    "Only root user can unlock, and it does not have a valid password. The station will not be locked.\n"
+                    "To override this security measure, pass --allow-passwordless-root.\n"
+                );
+                goto error;
+            }
         }
     }
 

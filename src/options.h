@@ -10,6 +10,7 @@ struct options {
     unsigned int block_kernel_messages;
     char** users;
     unsigned int users_size;
+    unsigned int allow_passwordless_root;
     char* message;
     unsigned int show_help;
     unsigned int show_version;

@@ -71,16 +71,17 @@ Note that `make install` will place the binary in the `/bin` directory, and will
 ## Usage
 
 ```
-Usage: ./simplylock [-slkhv] [-u users] [-m message]
+Usage: ./out/simplylock [-slkhv] [-u users] [-m message]
 
--s           Keep sysrequests enabled.
--l           Do not lock terminal switching.
--k           Do not mute kernel messages while the console is locked.
--u user      Comma separated list of users allowed to unlock.
-             Note that the root user will always be able to unlock.
--m message   Display the given message instead of the default one.
--h           Display this help text.
--v           Display version information.
+-s, --no-sysreq              Keep sysrequests enabled.
+-l, --no-lock                Do not lock terminal switching.
+-k, --no-kernel-messages     Do not mute kernel messages while the console is locked.
+-u, --users users            Comma separated list of users allowed to unlock.
+                             Note that the root user will always be able to unlock.
+-m, --message message        Display the given message instead of the default one.
+
+-h, --help                   Display this help text.
+-v, --version                Display version information.
 ```
 
 ## License

@@ -14,7 +14,14 @@
 static char* root_username = "root";
 
 static struct option long_options[] = {
-    { "allow-passwordless-root", no_argument, NULL, 'a' },
+    { "no-sysreq",               no_argument,       NULL, 's' },
+    { "no-lock",                 no_argument,       NULL, 'l' },
+    { "no-kernel-messages",      no_argument,       NULL, 'k' },
+    { "users",                   required_argument, NULL, 'u' },
+    { "allow-passwordless-root", no_argument,       NULL, 'a' },
+    { "message",                 required_argument, NULL, 'm' },
+    { "help",                    no_argument,       NULL, 'h' },
+    { "version",                 no_argument,       NULL, 'v' },
     { 0, 0, 0, 0 }
 };
 
@@ -23,15 +30,15 @@ static void print_usage(int argc, char** argv) {
         stderr,
         "Usage: %s [-slkhv] [-u users] [-m message]\n"
         "\n"
-        "-s           Keep sysrequests enabled.\n"
-        "-l           Do not lock terminal switching.\n"
-        "-k           Do not mute kernel messages while the console is locked.\n"
-        "-u user      Comma separated list of users allowed to unlock.\n"
-        "             Note that the root user will always be able to unlock.\n"
-        "-m message   Display the given message instead of the default one.\n"
+        "-s, --no-sysreq              Keep sysrequests enabled.\n"
+        "-l, --no-lock                Do not lock terminal switching.\n"
+        "-k, --no-kernel-messages     Do not mute kernel messages while the console is locked.\n"
+        "-u, --users users            Comma separated list of users allowed to unlock.\n"
+        "                             Note that the root user will always be able to unlock.\n"
+        "-m, --message message        Display the given message instead of the default one.\n"
         "\n"
-        "-h           Display this help text.\n"
-        "-v           Display version information.\n",
+        "-h, --help                   Display this help text.\n"
+        "-v, --version                Display version information.\n",
         argv[0]
     );
 }

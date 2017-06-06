@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L
-LDFLAGS = -lpam -lpam_misc
+LDFLAGS += -lpam -lpam_misc
 
 OBJECTS = vt.o \
 		  options.o \
@@ -8,14 +8,14 @@ OBJECTS = vt.o \
 		  lock.o \
 		  main.o
 
-%.o: %.cr
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+%.o: %.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
 default: $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o simplylock $(OBJECTS)
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o simplylock
 
 clean:
-	rm *.o simplylock
+	rm -f *.o simplylock || true
 
 install: default
 	cp ./simplylock /bin/simplylock

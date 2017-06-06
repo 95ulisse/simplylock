@@ -8,6 +8,8 @@ struct options {
     unsigned int block_sysrequests;
     unsigned int block_vt_switch;
     unsigned int block_kernel_messages;
+    unsigned int quick_unlock;
+    unsigned int backlight_off;
     char** users;
     unsigned int users_size;
     char* message;
@@ -23,7 +25,7 @@ struct options {
  *    @return      `struct options` containing the parsed options,
  *                 or `NULL` in case of an error, and sets `errno`.
  */
-struct options* options_parse(int argc, char** argv);
+struct options* options_parse(int argc, char** argv, uid_t uid);
 
 /**
  *    Releases all the resources allocated for a `struct options`.

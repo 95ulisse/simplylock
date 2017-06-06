@@ -76,6 +76,8 @@ Usage: ./simplylock [-slkhv] [-u users] [-m message]
 -s           Keep sysrequests enabled.
 -l           Do not lock terminal switching.
 -k           Do not mute kernel messages while the console is locked.
+-q           Quick unlock mode.
+-d           Turn off the backlight of the screen.
 -u user      Comma separated list of users allowed to unlock.
              Note that the root user will always be able to unlock.
 -m message   Display the given message instead of the default one.

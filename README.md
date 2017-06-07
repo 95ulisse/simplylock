@@ -1,4 +1,4 @@
-# SimplyLock [![Build Status](https://travis-ci.org/95ulisse/simplylock.svg?branch=master)](https://travis-ci.org/95ulisse/simplylock)
+# SimplyLock [![Build Status](https://travis-ci.org/MrTiz9/simplylock.svg?branch=master)](https://travis-ci.org/MrTiz9/simplylock)
 
 `SimplyLock` allows you restrict physical access to your Linux box by locking all virtual terminals.
 

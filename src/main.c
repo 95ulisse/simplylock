@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <setjmp.h>
+#include <time.h>
 
 #include "options.h"
 #include "vt.h"
@@ -93,6 +94,11 @@ int main(int argc, char** argv) {
     struct vt* vt;
     char* user;
     int c;
+    unsigned dcv;
+    unsigned wrong_pwd = 0;
+    unsigned time_sleep = 1;
+    time_t rawtime;
+    struct tm* _time;
 
     // Parses the options
     options = options_parse(argc, argv);
@@ -104,6 +110,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     user = options->users[0];
+    dcv = options->dont_clean_vt;
 
     // We need to run as root or setuid root
     if (geteuid() != 0) {
@@ -187,7 +194,7 @@ int main(int argc, char** argv) {
 
     // The auth loop
     for (;;) {
-        vt_clear(vt);
+        if (!dcv) vt_clear(vt);
         vt_flush(vt);
 
         if (options->message != NULL) {
@@ -212,8 +219,19 @@ int main(int argc, char** argv) {
             break;
         }
 
-        fprintf(stdout, "\nAuthentication failed.\n");
-        sleep(3);
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        if (dcv)
+            fprintf(stdout, "\n[%d:%d:%d] Authentication failed. Failed attempts: %u\n", 
+                            _time->tm_hour, _time->tm_min, _time->tm_sec, ++wrong_pwd);
+        else 
+            fprintf(stdout, "\nAuthentication failed.\n");
+
+        sleep(time_sleep);
+
+        if (time_sleep <= 64)
+            time_sleep += time_sleep;
     }
 
     vt_clear(vt);

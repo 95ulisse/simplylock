@@ -78,6 +78,7 @@ Usage: ./out/simplylock [-slkhv] [-u users] [-m message]
 -k, --no-kernel-messages     Do not mute kernel messages while the console is locked.
 -u, --users users            Comma separated list of users allowed to unlock.
                              Note that the root user will always be able to unlock.
+-c, --dont-clean-vt          Don't clean vt after wrong password.
 -m, --message message        Display the given message instead of the default one.
 
 -h, --help                   Display this help text.

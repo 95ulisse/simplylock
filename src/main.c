@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
         }
 
         time(&rawtime);
-        timeinfo = localtime(&rawtime);
+        _time = localtime(&rawtime);
 
         if (dcv)
             fprintf(stdout, "\n[%d:%d:%d] Authentication failed. Failed attempts: %u\n", 

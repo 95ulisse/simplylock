@@ -55,18 +55,18 @@ struct vt* vt_createnew() {
     // First we find an available vt
     int ret;
     while ((ret = ioctl(console_fd, VT_OPENQRY, &vt->number)) == -1 && errno == EINTR);
-	if (ret < 0) {
+    if (ret < 0) {
         goto error;
     }
 
     // Then we open the corresponding device file
     char path[1024];
     snprintf(path, sizeof(path), VT_TTY_FORMAT, vt->number);
-	while ((vt->stream = fopen(path, "r+")) == NULL && errno == EINTR);
-	if (vt->stream == NULL) {
-		goto error;
+    while ((vt->stream = fopen(path, "r+")) == NULL && errno == EINTR);
+    if (vt->stream == NULL) {
+        goto error;
     }
-	vt->fd = fileno(vt->stream);
+    vt->fd = fileno(vt->stream);
 
     // And get terminal attributes
     while ((ret = tcgetattr(vt->fd, &vt->term)) == -1 && errno == EINTR);
@@ -79,7 +79,7 @@ struct vt* vt_createnew() {
     vt->term.c_iflag |= IGNBRK;
     vt->term.c_lflag &= ~(ECHO | ISIG);
     vt->term.c_cc[VEOF] = 0;
-	while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
+    while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
     if (ret < 0) {
         goto error;
     }
@@ -121,13 +121,13 @@ int vt_switch(struct vt* vt) {
     // Switch vt
     int ret;
     while ((ret = ioctl(console_fd, VT_ACTIVATE, vt->number)) == -1 && errno == EINTR);
-	if (ret < 0) {
+    if (ret < 0) {
         return -1;
     }
 
     // Wait for switch to complete
     while ((ret = ioctl(console_fd, VT_WAITACTIVE, vt->number)) == -1 && errno == EINTR);
-	if (ret < 0) {
+    if (ret < 0) {
         return -1;
     }
 
@@ -149,7 +149,7 @@ int vt_setecho(struct vt* vt, int echo) {
     }
 
     int ret;
-	while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
+    while ((ret = tcsetattr(vt->fd, TCSANOW, &vt->term)) == -1 && errno == EINTR);
     return ret;
 }
 

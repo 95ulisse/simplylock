@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <linux/vt.h>
+#include <linux/tiocl.h>
 #include <errno.h>
 
 #include "vt.h"
@@ -159,6 +160,11 @@ int vt_flush(struct vt* vt) {
 
 int vt_clear(struct vt* vt) {
     return write(vt->fd, "\033[H\033[J", 6) == 6 ? 0 : -1;
+}
+
+int vt_blank(struct vt* vt, int blank) {
+    int arg = blank ? TIOCL_BLANKSCREEN : TIOCL_UNBLANKSCREEN;
+    return ioctl(vt->fd, TIOCLINUX, &arg);
 }
 
 int vt_signals(struct vt* vt, vt_signals_t sigs) {

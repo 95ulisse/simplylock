@@ -71,7 +71,7 @@ Note that `make install` will place the binary in the `/bin` directory, and will
 ## Usage
 
 ```
-Usage: ./out/simplylock [-slkhv] [-u users] [-m message]
+Usage: ./out/simplylock [-slkdhv] [-u users] [-m message]
 
 -s, --no-sysreq              Keep sysrequests enabled.
 -l, --no-lock                Do not lock terminal switching.
@@ -79,6 +79,7 @@ Usage: ./out/simplylock [-slkhv] [-u users] [-m message]
 -u, --users users            Comma separated list of users allowed to unlock.
                              Note that the root user will always be able to unlock.
 -m, --message message        Display the given message instead of the default one.
+-d, --dark                   Dark mode: switch off the screen after locking.
 
 -h, --help                   Display this help text.
 -v, --version                Display version information.

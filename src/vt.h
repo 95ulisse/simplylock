@@ -109,6 +109,14 @@ int vt_flush(struct vt* vt);
 int vt_clear(struct vt* vt);
 
 /**
+ *    Blanks the screen of the given terminal.
+ *
+ *    @param vt Virtual terminal.
+ *    @return `0` in case of success, `-1` otherwise and sets `errno`.
+ */
+int vt_blank(struct vt* vt, int blank);
+
+/**
  *    Enables or disables signal generation from terminal.
  *    Recognized signals:
  *    - SIGINT

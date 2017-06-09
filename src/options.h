@@ -12,6 +12,7 @@ struct options {
     unsigned int users_size;
     unsigned int allow_passwordless_root;
     char* message;
+    unsigned int dark_mode;
     unsigned int show_help;
     unsigned int show_version;
 };

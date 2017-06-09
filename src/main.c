@@ -55,6 +55,12 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
         vt_flush(vt);
         vt_clear(vt);
 
+        // Switch on the screen if in dark mode
+        if (options->dark_mode) {
+            vt_blank(vt, 0);
+        }
+
+        // Users list
         fprintf(stdout, "\nThe following users are authorized to unlock:\n\n");
         for (int i = 0; i < options->users_size; i++) {
             char* format = "%d. %s\n";
@@ -65,6 +71,7 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
         }
         fprintf(stdout, "\nInsert the number of the user that wants to unlock and press enter: ");
 
+        // Wait for user selection
         char* line = NULL;
         size_t n = 0;
         vt_setecho(vt, 1);
@@ -210,6 +217,11 @@ int main(int argc, char** argv) {
         if (auth_authenticate_user(user) == 0) {
             // The user is authenticated, so we can unlock everything
             break;
+        }
+
+        // Switch the screen back on before authentication
+        if (options->dark_mode) {
+            vt_blank(vt, 0);
         }
 
         fprintf(stdout, "\nAuthentication failed.\n");

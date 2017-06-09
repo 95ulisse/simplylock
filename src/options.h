@@ -14,6 +14,7 @@ struct options {
     char* message;
     unsigned int dont_clean_vt;
     unsigned int dark_mode;
+    unsigned int quick_mode;
     unsigned int show_help;
     unsigned int show_version;
 };

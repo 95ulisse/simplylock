@@ -167,6 +167,11 @@ int vt_blank(struct vt* vt, int blank) {
     return ioctl(vt->fd, TIOCLINUX, &arg);
 }
 
+int vt_blank(struct vt* vt, int blank) {
+    int arg = blank ? TIOCL_BLANKSCREEN : TIOCL_UNBLANKSCREEN;
+    return ioctl(vt->fd, TIOCLINUX, &arg);
+}
+
 int vt_signals(struct vt* vt, vt_signals_t sigs) {
 
     // Since we created the vt with signals disabled, we need to enable them

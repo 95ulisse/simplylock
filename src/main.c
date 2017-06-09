@@ -209,24 +209,46 @@ int main(int argc, char** argv) {
         }
         fprintf(stdout, "\nPress enter to unlock as " HIGHLIGHT "%s" RESET ". [Press Ctrl+C to change user] ", user);
 
-        user_selection_enabled = 1;
-        c = fgetc(stdin);
-        while (c != EOF && c != '\n') {
+        // Wait for enter to be pressed if not in quick mode.
+        // If we are in quick mode, instead, jump directly to
+        // authentication, and disable quick mode, so that after
+        // a failed attempt, it will be requested to press enter.
+        //
+        // This way, if both quick mode and dark mode are enabled,
+        // the user will be able to make a first login attempt
+        // with the screen switched off, and then it will be turned on later.
+        if (!options->quick_mode) {
+            
+            // Wait for enter
+            user_selection_enabled = 1;
             c = fgetc(stdin);
+            while (c != EOF && c != '\n') {
+                c = fgetc(stdin);
+            }
+            if (c == EOF) {
+                perror("getchar");
+                goto error;
+            }
+            fprintf(stdout, "\n");
+            user_selection_enabled = 0;
+
+            // Switch the screen back on before authentication
+            if (options->dark_mode) {
+                vt_blank(vt, 0);
+            }
+
+        } else {
+            options->quick_mode = 0;
+            fprintf(stdout, "\n");
         }
-        if (c == EOF) {
-            perror("getchar");
-            goto error;
-        }
-        fprintf(stdout, "\n");
-        user_selection_enabled = 0;
 
         if (auth_authenticate_user(user) == 0) {
             // The user is authenticated, so we can unlock everything
             break;
         }
 
-        // Switch the screen back on before authentication
+        // Switch the screen back on to be sure that the user knows
+        // the authentication failed.
         if (options->dark_mode) {
             vt_blank(vt, 0);
         }

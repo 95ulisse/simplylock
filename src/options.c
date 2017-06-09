@@ -22,6 +22,7 @@ static struct option long_options[] = {
     { "message",                 required_argument, NULL, 'm' },
     { "dont-clean-vt",           no_argument,       NULL, 'c' },
     { "dark",                    no_argument,       NULL, 'd' },
+    { "quick",                   no_argument,       NULL, 'q' },
     { "help",                    no_argument,       NULL, 'h' },
     { "version",                 no_argument,       NULL, 'v' },
     { 0, 0, 0, 0 }
@@ -30,7 +31,7 @@ static struct option long_options[] = {
 static void print_usage(int argc, char** argv) {
     fprintf(
         stderr,
-        "Usage: %s [-slkhv] [-u users] [-m message]\n"
+        "Usage: %s [-slkdqhv] [-u users] [-m message]\n"
         "\n"
         "-s, --no-sysreq              Keep sysrequests enabled.\n"
         "-l, --no-lock                Do not lock terminal switching.\n"
@@ -40,6 +41,7 @@ static void print_usage(int argc, char** argv) {
         "-m, --message message        Display the given message instead of the default one.\n"
         "-c, --dont-clean-vt          Don't clean vt after wrong password.\n"
         "-d, --dark                   Dark mode: switch off the screen after locking.\n"
+        "-q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.\n"
         "\n"
         "-h, --help                   Display this help text.\n"
         "-v, --version                Display version information.\n",
@@ -133,12 +135,13 @@ struct options* options_parse(int argc, char** argv) {
     options->message = NULL;
     options->dont_clean_vt = 0;
     options->dark_mode = 0;
+    options->quick_mode = 0;
     options->show_help = 0;
     options->show_version = 0;
 
     // Args parsing
     int opt;
-    while ((opt = getopt_long(argc, argv, "slku:cm:dhv", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "slku:cm:dqhv", long_options, NULL)) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -165,6 +168,9 @@ struct options* options_parse(int argc, char** argv) {
                 break;
             case 'd':
                 options->dark_mode = 1;
+                break;
+            case 'q':
+                options->quick_mode = 1;
                 break;
             case 'h':
                 print_usage(argc, argv);

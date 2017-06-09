@@ -9,7 +9,7 @@
 
 #include "options.h"
 
-#define SIMPLYLOCK_VERSION "0.1.0"
+#define SIMPLYLOCK_VERSION "0.2.0"
 
 static char* root_username = "root";
 

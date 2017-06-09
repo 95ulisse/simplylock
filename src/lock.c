@@ -113,10 +113,20 @@ struct vt* lock(struct options* options) {
         return NULL;
     }
 
+    // Switch the screen off
+    if (options->dark_mode) {
+        vt_blank(vt, 1);
+    }
+
     return vt;
 }
 
 void unlock(struct options* options) {
+
+    // Switch the screen on
+    if (options->dark_mode) {
+        vt_blank(vt, 0);
+    }
 
     // Re-enable vt switching
     if (options->block_vt_switch && vt_lockswitch(0) < 0) {

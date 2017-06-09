@@ -80,6 +80,7 @@ Usage: ./out/simplylock [-slkhv] [-u users] [-m message]
                              Note that the root user will always be able to unlock.
 -c, --dont-clean-vt          Don't clean vt after wrong password.
 -m, --message message        Display the given message instead of the default one.
+-d, --dark                   Dark mode: switch off the screen after locking.
 
 -h, --help                   Display this help text.
 -v, --version                Display version information.

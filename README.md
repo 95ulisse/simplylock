@@ -1,4 +1,4 @@
-# SimplyLock [![Build Status](https://travis-ci.org/95ulisse/simplylock.svg?branch=master)](https://travis-ci.org/95ulisse/simplylock)
+# SimplyLock [![Build Status](https://travis-ci.org/MrTiz9/simplylock.svg?branch=master)](https://travis-ci.org/MrTiz9/simplylock)
 
 `SimplyLock` allows you restrict physical access to your Linux box by locking all virtual terminals.
 
@@ -78,6 +78,7 @@ Usage: ./out/simplylock [-slkdqhv] [-u users] [-m message]
 -k, --no-kernel-messages     Do not mute kernel messages while the console is locked.
 -u, --users users            Comma separated list of users allowed to unlock.
                              Note that the root user will always be able to unlock.
+-c, --dont-clean-vt          Don't clean vt after wrong password.
 -m, --message message        Display the given message instead of the default one.
 -d, --dark                   Dark mode: switch off the screen after locking.
 -q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.

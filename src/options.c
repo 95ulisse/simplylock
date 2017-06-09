@@ -20,6 +20,7 @@ static struct option long_options[] = {
     { "users",                   required_argument, NULL, 'u' },
     { "allow-passwordless-root", no_argument,       NULL, 'a' },
     { "message",                 required_argument, NULL, 'm' },
+    { "dont-clean-vt",           no_argument,       NULL, 'c' },
     { "dark",                    no_argument,       NULL, 'd' },
     { "quick",                   no_argument,       NULL, 'q' },
     { "help",                    no_argument,       NULL, 'h' },
@@ -38,6 +39,7 @@ static void print_usage(int argc, char** argv) {
         "-u, --users users            Comma separated list of users allowed to unlock.\n"
         "                             Note that the root user will always be able to unlock.\n"
         "-m, --message message        Display the given message instead of the default one.\n"
+        "-c, --dont-clean-vt          Don't clean vt after wrong password.\n"
         "-d, --dark                   Dark mode: switch off the screen after locking.\n"
         "-q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.\n"
         "\n"
@@ -131,6 +133,7 @@ struct options* options_parse(int argc, char** argv) {
     options->users = NULL;
     options->allow_passwordless_root = 0;
     options->message = NULL;
+    options->dont_clean_vt = 0;
     options->dark_mode = 0;
     options->quick_mode = 0;
     options->show_help = 0;
@@ -138,7 +141,7 @@ struct options* options_parse(int argc, char** argv) {
 
     // Args parsing
     int opt;
-    while ((opt = getopt_long(argc, argv, "slku:m:dqhv", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "slku:cm:dqhv", long_options, NULL)) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -159,6 +162,9 @@ struct options* options_parse(int argc, char** argv) {
                 break;
             case 'm':
                 options->message = optarg;
+                break;
+            case 'c':
+                options->dont_clean_vt = 1;
                 break;
             case 'd':
                 options->dark_mode = 1;

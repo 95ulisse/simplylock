@@ -159,7 +159,7 @@ int vt_flush(struct vt* vt) {
 }
 
 int vt_clear(struct vt* vt) {
-    return write(vt->fd, "\033[H\033[J", 6) == 6 ? 0 : -1;
+	return write(vt->fd, "\033[H\033[J", 6) == 6 ? 0 : -1;
 }
 
 int vt_blank(struct vt* vt, int blank) {

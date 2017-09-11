@@ -24,6 +24,6 @@ clean:
 	rm -rf $(OUT)
 
 install: default
-	cp $(OUT)/simplylock /bin/simplylock
-	chown root:root /bin/simplylock
-	chmod 4755 /bin/simplylock
+	cp $(OUT)/simplylock /usr/bin/simplylock
+	chown root:root /usr/bin/simplylock
+	chmod 4755 /usr/bin/simplylock

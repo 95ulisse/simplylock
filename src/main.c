@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
 
     // Load the background image if requested
     if (options->background != NULL) {
-        bg = bg_init(options->background, options->fbdev);
+        bg = bg_init(options->background, options->background_fill, options->fbdev);
         // Don't check for errors: if there has been an error,
         // just don't paint the background.
     }

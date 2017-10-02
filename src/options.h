@@ -1,6 +1,8 @@
 #ifndef __OPTIONS_H__
 #define __OPTIONS_H__
 
+#include "bg.h"
+
 /**
  *    Structure containing all the SimplyLock options.
  */
@@ -15,6 +17,7 @@ struct options {
     unsigned int dark_mode;
     unsigned int quick_mode;
     char* background;
+    enum background_fill_t background_fill;
     char* fbdev;
     unsigned int show_help;
     unsigned int show_version;

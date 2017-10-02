@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <stropts.h>
@@ -27,7 +28,72 @@ struct bg {
 
 };
 
-void* bg_init(const char* path, const char* fbdev) {
+static bool fill_image(struct bg* bg, enum background_fill_t fill) {
+    
+    // Extract width and height of the image
+    int img_w = MagickGetImageWidth(bg->m_wand);
+    int img_h = MagickGetImageHeight(bg->m_wand);
+
+    // Screen size
+    int screen_w = bg->width;
+    int screen_h = bg->height;
+
+    switch (fill) {
+        
+        case CENTER:
+            // This centres the original image on a new canvas.
+            if (MagickExtentImage(bg->m_wand, screen_w, screen_h, -(screen_w - img_w) / 2, -(screen_h - img_h) / 2) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+            break;
+        
+        case STRETCH:
+            // Resize the image to match the screen size
+            if (MagickResizeImage(bg->m_wand, screen_w, screen_h, LanczosFilter, 1) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+            break;
+        
+        case RESIZE: {
+        
+            // Take the smaller ratio
+            float ratio_w = (float)screen_w / (float)img_w;
+            float ratio_h = (float)screen_h / (float)img_h;
+            float ratio = ratio_w < ratio_h ? ratio_w : ratio_h;
+
+            // Compute the new dimensions
+            int new_w = (int)(ratio * img_w);
+            int new_h = (int)(ratio * img_h);
+
+            // Resize the image
+            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter, 1) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+
+            // Center the image
+            if (MagickExtentImage(bg->m_wand, screen_w, screen_h, -(screen_w - new_w) / 2, -(screen_h - new_h) / 2) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+
+            break;
+        }
+        
+        default:
+            fprintf(stderr, "Unexpected background fill value.\n");
+            abort();
+            break;
+
+    }
+
+    return true;
+
+}
+
+void* bg_init(const char* path, enum background_fill_t fill, const char* fbdev) {
     
     struct fb_var_screeninfo vinfo;
     struct fb_fix_screeninfo finfo;
@@ -103,16 +169,8 @@ void* bg_init(const char* path, const char* fbdev) {
         goto error;
     }
 
-    // Extract width and height of the image
-    int img_w = MagickGetImageWidth(bg->m_wand);
-    int img_h = MagickGetImageHeight(bg->m_wand);
-    
-    // This centres the original image on the new canvas.
-	// Note that the extent's offset is relative to the 
-	// top left corner of the *original* image, so adding an extent
-	// around it means that the offset will be negative
-	if (MagickExtentImage(bg->m_wand, bg->width, bg->height, -(bg->width - img_w) / 2, -(bg->height - img_h) / 2) == MagickFalse) {
-        fprintf(stderr, "Error manipulating image.\n");
+    // Prepares the image so that it matches the screen size
+    if (!fill_image(bg, fill)) {
         goto error;
     }
 

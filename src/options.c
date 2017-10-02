@@ -9,7 +9,7 @@
 
 #include "options.h"
 
-#define SIMPLYLOCK_VERSION "0.2.0"
+#define SIMPLYLOCK_VERSION "0.3.0"
 
 static char* root_username = "root";
 
@@ -23,6 +23,7 @@ static struct option long_options[] = {
     { "dark",                    no_argument,       NULL, 'd' },
     { "quick",                   no_argument,       NULL, 'q' },
     { "background",              required_argument, NULL, 'b' },
+    { "background-fill",         required_argument, NULL,  0  },
     { "fbdev",                   required_argument, NULL,  0  },
     { "help",                    no_argument,       NULL, 'h' },
     { "version",                 no_argument,       NULL, 'v' },
@@ -42,7 +43,12 @@ static void print_usage(int argc, char** argv) {
         "-m, --message message        Display the given message instead of the default one.\n"
         "-d, --dark                   Dark mode: switch off the screen after locking.\n"
         "-q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.\n"
+        "\n"
         "-b, --background             Set background image.\n"
+        "    --background-fill        Background fill mode. Available values:\n"
+        "                             - center: center the image without resizing it.\n"
+        "                             - stretch: stretch the image to fill all the available space.\n"
+        "                             - resize: like stretch, but keeps image proportions. (default)\n"
         "    --fbdev                  Path to the framebuffer device to use to draw the background.\n"
         "\n"
         "-h, --help                   Display this help text.\n"
@@ -138,6 +144,7 @@ struct options* options_parse(int argc, char** argv) {
     options->dark_mode = 0;
     options->quick_mode = 0;
     options->background = NULL;
+    options->background_fill = RESIZE;
     options->fbdev = "/dev/fb0";
     options->show_help = 0;
     options->show_version = 0;
@@ -190,6 +197,18 @@ struct options* options_parse(int argc, char** argv) {
                 } else if (strcmp("fbdev", opt_name) == 0) {
                     options->fbdev = optarg;
                     break;
+                } else if (strcmp("background-fill", opt_name) == 0) {
+                    if (strcmp("center", optarg) == 0) {
+                        options->background_fill = CENTER;
+                        break;
+                    } else if (strcmp("stretch", optarg) == 0) {
+                        options->background_fill = STRETCH;
+                        break;
+                    } else if (strcmp("resize", optarg) == 0) {
+                        options->background_fill = RESIZE;
+                        break;
+                    }
+                    // Fall to default
                 }
                 // Fall to default
             }

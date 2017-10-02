@@ -4,6 +4,8 @@ addons:
   apt:
     packages:
     - libpam0g-dev
+    - imagemagick
+    - libmagickwand-dev
 
 script:
   - make

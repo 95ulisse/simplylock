@@ -10,6 +10,8 @@
 
 #include "bg.h"
 
+static bool magick_wand_inited = false;
+
 struct bg {
     
     // Framebuffer fd and mmapped memory address
@@ -145,8 +147,9 @@ void* bg_init(const char* path, enum background_fill_t fill, const char* fbdev) 
     bg->fbmem_len = finfo.smem_len;
 
     // Initialize MagickWand if not done yet
-    if (IsMagickWandInstantiated() == MagickFalse) {
+    if (!magick_wand_inited) {
         MagickWandGenesis();
+        magick_wand_inited = true;
     }
 
     // Create the needed wands

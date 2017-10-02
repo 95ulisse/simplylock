@@ -51,11 +51,27 @@ Use the `-u` option to list other users that can unlock.
 
 ## Installation
 
-To compile SimplyLock from source, you will need PAM headers, so install the package for your
-distribution. If you use Debian, for example, you can install the `libpam0g-dev` package:
+If you use Arch Linux, SimplyLock is easily available from the [AUR](https://aur.archlinux.org/packages/simplylock-git/):
+
+```
+$ yaourt -S simplylock-git
+```
+
+If you don't use Arch, you can always compile SimplyLock from source.
+
+## Compile from source
+
+To compile SimplyLock from source, you will need PAM and MagickWand headers, so install the package
+for your distribution. If you use Debian, for example, you can install the following packages:
 
 ```
 # apt-get install libpam0g-dev libmagickwand-dev
+```
+
+For Arch Linux:
+
+```
+# pacman -S pam imagemagick
 ```
 
 Now, compile and install SimplyLock with the following commands:
@@ -65,7 +81,7 @@ $ make
 # make install
 ```
 
-Note that `make install` will place the binary in the `/bin` directory, and will give it
+Note that `make install` will place the binary in the `/usr/bin` directory, and will give it
 **root ownership and set the setuid bit**, so that everyone can use SimplyLock.
 
 ## Background image

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L
+CFLAGS += -std=c99 -Wall -pedantic -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags --libs MagickWand)
 INCLUDES = -I./src
 LDFLAGS += -lpam -lpam_misc
 
@@ -7,6 +7,7 @@ SRC = src
 OUT = out
 
 OBJECTS = $(OUT)/vt.o \
+		  $(OUT)/bg.o \
 		  $(OUT)/options.o \
 		  $(OUT)/auth.o \
 		  $(OUT)/lock.o \

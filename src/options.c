@@ -18,10 +18,12 @@ static struct option long_options[] = {
     { "no-lock",                 no_argument,       NULL, 'l' },
     { "no-kernel-messages",      no_argument,       NULL, 'k' },
     { "users",                   required_argument, NULL, 'u' },
-    { "allow-passwordless-root", no_argument,       NULL, 'a' },
+    { "allow-passwordless-root", no_argument,       NULL,  0  },
     { "message",                 required_argument, NULL, 'm' },
     { "dark",                    no_argument,       NULL, 'd' },
     { "quick",                   no_argument,       NULL, 'q' },
+    { "background",              required_argument, NULL, 'b' },
+    { "fbdev",                   required_argument, NULL,  0  },
     { "help",                    no_argument,       NULL, 'h' },
     { "version",                 no_argument,       NULL, 'v' },
     { 0, 0, 0, 0 }
@@ -30,7 +32,7 @@ static struct option long_options[] = {
 static void print_usage(int argc, char** argv) {
     fprintf(
         stderr,
-        "Usage: %s [-slkdqhv] [-u users] [-m message]\n"
+        "Usage: %s [-slkdqhv] [-u users] [-m message] [-b path]\n"
         "\n"
         "-s, --no-sysreq              Keep sysrequests enabled.\n"
         "-l, --no-lock                Do not lock terminal switching.\n"
@@ -40,6 +42,8 @@ static void print_usage(int argc, char** argv) {
         "-m, --message message        Display the given message instead of the default one.\n"
         "-d, --dark                   Dark mode: switch off the screen after locking.\n"
         "-q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.\n"
+        "-b, --background             Set background image.\n"
+        "    --fbdev                  Path to the framebuffer device to use to draw the background.\n"
         "\n"
         "-h, --help                   Display this help text.\n"
         "-v, --version                Display version information.\n",
@@ -133,12 +137,15 @@ struct options* options_parse(int argc, char** argv) {
     options->message = NULL;
     options->dark_mode = 0;
     options->quick_mode = 0;
+    options->background = NULL;
+    options->fbdev = "/dev/fb0";
     options->show_help = 0;
     options->show_version = 0;
 
     // Args parsing
     int opt;
-    while ((opt = getopt_long(argc, argv, "slku:m:dqhv", long_options, NULL)) != -1) {
+    int longopt_index;
+    while ((opt = getopt_long(argc, argv, "slku:m:dqb:hv", long_options, &longopt_index)) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -154,9 +161,6 @@ struct options* options_parse(int argc, char** argv) {
                     goto error;
                 }
                 break;
-            case 'a':
-                options->allow_passwordless_root = 1;
-                break;
             case 'm':
                 options->message = optarg;
                 break;
@@ -166,6 +170,9 @@ struct options* options_parse(int argc, char** argv) {
             case 'q':
                 options->quick_mode = 1;
                 break;
+            case 'b':
+                options->background = optarg;
+                break;
             case 'h':
                 print_usage(argc, argv);
                 options->show_help = 1;
@@ -174,6 +181,19 @@ struct options* options_parse(int argc, char** argv) {
                 print_version();
                 options->show_version = 1;
                 break;
+
+            case 0: {
+                const char* opt_name = long_options[longopt_index].name;
+                if (strcmp("allow-passwordless-root", opt_name) == 0) {
+                    options->allow_passwordless_root = 1;
+                    break;
+                } else if (strcmp("fbdev", opt_name) == 0) {
+                    options->fbdev = optarg;
+                    break;
+                }
+                // Fall to default
+            }
+
             default:
                 print_usage(argc, argv);
                 goto error;

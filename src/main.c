@@ -9,6 +9,7 @@
 
 #include "options.h"
 #include "vt.h"
+#include "bg.h"
 #include "auth.h"
 #include "lock.h"
 
@@ -48,12 +49,17 @@ static inline int register_signal(int sig, void (*handler)(int)) {
     return sigaction(sig, &action, NULL);
 }
 
-static int user_selection(struct options* options, struct vt* vt, char** user) {
+static int user_selection(struct options* options, struct vt* vt, void* bg, char** user) {
     int index;
     do {
 
         vt_flush(vt);
         vt_clear(vt);
+        
+        // Background
+        if (bg != NULL) {
+            bg_paint(bg);
+        }
 
         // Switch on the screen if in dark mode
         if (options->dark_mode) {
@@ -98,6 +104,7 @@ static int user_selection(struct options* options, struct vt* vt, char** user) {
 int main(int argc, char** argv) {
     struct options* options;
     struct vt* vt;
+    void* bg = NULL;
     char* user;
     int c;
 
@@ -162,6 +169,13 @@ int main(int argc, char** argv) {
         goto error;
     }
 
+    // Load the background image if requested
+    if (options->background != NULL) {
+        bg = bg_init(options->background, options->fbdev);
+        // Don't check for errors: if there has been an error,
+        // just don't paint the background.
+    }
+
     // Locking of the terminal
     vt = lock(options);
     if (vt == NULL) {
@@ -189,13 +203,17 @@ int main(int argc, char** argv) {
 
     // User selection: this code will be executed only when the user presses Ctrl+C
     if (sigsetjmp(user_selection_jmp, 1) > 0) {
-        user_selection(options, vt, &user);
+        user_selection(options, vt, bg, &user);
     }
 
     // The auth loop
     for (;;) {
         vt_clear(vt);
         vt_flush(vt);
+
+        if (bg != NULL) {
+            bg_paint(bg);
+        }
 
         if (options->message != NULL) {
             fprintf(stdout, "\n%s\n", options->message);
@@ -250,6 +268,11 @@ int main(int argc, char** argv) {
         sleep(3);
     }
 
+    
+    if (bg != NULL) {
+        bg_free(bg);
+    }
+
     vt_clear(vt);
     unlock(options);
 
@@ -263,6 +286,9 @@ clean_and_exit:
     return 0;
 
 error:
+    if (bg != NULL) {
+        bg_free(bg);
+    }
     unlock(options);
     fclose(stdin);
     fclose(stdout);

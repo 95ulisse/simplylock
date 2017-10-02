@@ -14,6 +14,8 @@ struct options {
     char* message;
     unsigned int dark_mode;
     unsigned int quick_mode;
+    char* background;
+    char* fbdev;
     unsigned int show_help;
     unsigned int show_version;
 };

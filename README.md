@@ -55,7 +55,7 @@ To compile SimplyLock from source, you will need PAM headers, so install the pac
 distribution. If you use Debian, for example, you can install the `libpam0g-dev` package:
 
 ```
-# apt-get install libpam0g-dev
+# apt-get install libpam0g-dev libmagickwand-dev
 ```
 
 Now, compile and install SimplyLock with the following commands:
@@ -68,10 +68,27 @@ $ make
 Note that `make install` will place the binary in the `/bin` directory, and will give it
 **root ownership and set the setuid bit**, so that everyone can use SimplyLock.
 
+## Background image
+
+Optionally, you can add a background image to your lock screen. To do so, pass the path to
+the image to the `-b / --background` option:
+
+```
+simplylock -b /home/user/Pictures/lock.jpg
+```
+
+By default, the image is resized and centered to the screen. To change this behaviour,
+use the `--background-fill` option.
+
+This feature requires the **Linux framebuffer**: if `/dev/fb0` is not available,
+use the `--fbdev` option to point to the correct framebuffer device.
+
+**Note**: this is still preliminary support. Expect glitches and bugs.
+
 ## Usage
 
 ```
-Usage: ./out/simplylock [-slkdqhv] [-u users] [-m message]
+Usage: simplylock [-slkdqhv] [-u users] [-m message] [-b path]
 
 -s, --no-sysreq              Keep sysrequests enabled.
 -l, --no-lock                Do not lock terminal switching.
@@ -81,6 +98,13 @@ Usage: ./out/simplylock [-slkdqhv] [-u users] [-m message]
 -m, --message message        Display the given message instead of the default one.
 -d, --dark                   Dark mode: switch off the screen after locking.
 -q, --quick                  Quick mode: do not wait for enter to be pressed to unlock.
+
+-b, --background             Set background image.
+    --background-fill        Background fill mode. Available values:
+                             - center: center the image without resizing it.
+                             - stretch: stretch the image to fill all the available space.
+                             - resize: like stretch, but keeps image proportions. (default)
+    --fbdev                  Path to the framebuffer device to use to draw the background.
 
 -h, --help                   Display this help text.
 -v, --version                Display version information.

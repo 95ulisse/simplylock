@@ -82,6 +82,34 @@ static bool fill_image(struct bg* bg, enum background_fill_t fill) {
             }
 
             break;
+
+        }
+
+        case RESIZE_FILL: {
+            
+            // Take the bigger ratio
+            float ratio_w = (float)screen_w / (float)img_w;
+            float ratio_h = (float)screen_h / (float)img_h;
+            float ratio = ratio_w < ratio_h ? ratio_h : ratio_w;
+
+            // Compute the new dimensions
+            int new_w = (int)(ratio * img_w);
+            int new_h = (int)(ratio * img_h);
+
+            // Resize the image
+            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter, 1) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+
+            // Center the image
+            if (MagickExtentImage(bg->m_wand, screen_w, screen_h, -(screen_w - new_w) / 2, -(screen_h - new_h) / 2) == MagickFalse) {
+                fprintf(stderr, "Error manipulating image.\n");
+                return false;
+            }
+
+            break;
+
         }
         
         default:

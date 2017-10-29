@@ -48,7 +48,8 @@ static void print_usage(int argc, char** argv) {
         "    --background-fill        Background fill mode. Available values:\n"
         "                             - center: center the image without resizing it.\n"
         "                             - stretch: stretch the image to fill all the available space.\n"
-        "                             - resize: like stretch, but keeps image proportions. (default)\n"
+        "                             - resize: like stretch, but keeps image proportions.\n"
+        "                             - resize-fill: resize the image to fill the screen but keep proportions. (default)\n"
         "    --fbdev                  Path to the framebuffer device to use to draw the background.\n"
         "\n"
         "-h, --help                   Display this help text.\n"
@@ -144,7 +145,7 @@ struct options* options_parse(int argc, char** argv) {
     options->dark_mode = 0;
     options->quick_mode = 0;
     options->background = NULL;
-    options->background_fill = RESIZE;
+    options->background_fill = RESIZE_FILL;
     options->fbdev = "/dev/fb0";
     options->show_help = 0;
     options->show_version = 0;
@@ -206,6 +207,9 @@ struct options* options_parse(int argc, char** argv) {
                         break;
                     } else if (strcmp("resize", optarg) == 0) {
                         options->background_fill = RESIZE;
+                        break;
+                    } else if (strcmp("resize-fill", optarg) == 0) {
+                        options->background_fill = RESIZE_FILL;
                         break;
                     }
                     // Fall to default

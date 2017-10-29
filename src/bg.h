@@ -5,9 +5,10 @@
  * All possible supported background fill modes. 
  */
 enum background_fill_t {
-    CENTER,   // No resize
-    STRETCH,  // Stretch to fill
-    RESIZE    // Resize but keep proportions
+    CENTER,     // No resize
+    STRETCH,    // Stretch to fill
+    RESIZE,     // Resize but keep proportions
+    RESIZE_FILL // Resize the image to fill the whole screen, but keep proportions
 };
 
 /**

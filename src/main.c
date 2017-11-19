@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <setjmp.h>
+#include <sys/wait.h>
 
 #include "options.h"
 #include "vt.h"
@@ -157,10 +158,31 @@ int main(int argc, char** argv) {
 
     // Now we fork and move to a new session so that we can be the
     // foreground process for the new terminal to be created
-    if (fork() == 0) {
-        setsid();
+    pid_t childpid;
+    if ((childpid = fork()) == 0) {
+        if (setsid() < 0) {
+            perror("setsid");
+            return 1;
+        }
+    } else if (childpid == -1) {
+        perror("fork");
+        return 1;
     } else {
-        goto clean_and_exit;
+        // Wait for the child process to terminate.
+        if (options->dont_detach) {
+            int status;
+            pid_t wpid;
+            while ((wpid = waitpid(childpid, &status, 0)) == -1 && errno == EINTR);
+            if (wpid == -1) {
+                perror("waitpid");
+                return 1;
+            } else if (WIFEXITED(status)) {
+                return WEXITSTATUS(status);
+            } else if (WIFSIGNALED(status)) {
+                return 128 + WSTOPSIG(status);
+            }
+        }
+        return 0;
     }
 
     // Initialize VT library
@@ -277,7 +299,6 @@ int main(int argc, char** argv) {
     unlock(options);
 
     // Cleanup
-clean_and_exit:
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);

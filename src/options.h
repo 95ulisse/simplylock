@@ -19,6 +19,7 @@ struct options {
     char* background;
     enum background_fill_t background_fill;
     char* fbdev;
+    unsigned int dont_detach;
     unsigned int show_help;
     unsigned int show_version;
 };

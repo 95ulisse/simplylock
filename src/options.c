@@ -9,7 +9,7 @@
 
 #include "options.h"
 
-#define SIMPLYLOCK_VERSION "0.3.0"
+#define SIMPLYLOCK_VERSION "0.4.0"
 
 static char* root_username = "root";
 
@@ -25,6 +25,7 @@ static struct option long_options[] = {
     { "background",              required_argument, NULL, 'b' },
     { "background-fill",         required_argument, NULL,  0  },
     { "fbdev",                   required_argument, NULL,  0  },
+    { "no-detach",               no_argument,       NULL, 'D' },
     { "help",                    no_argument,       NULL, 'h' },
     { "version",                 no_argument,       NULL, 'v' },
     { 0, 0, 0, 0 }
@@ -51,6 +52,8 @@ static void print_usage(int argc, char** argv) {
         "                             - resize: like stretch, but keeps image proportions.\n"
         "                             - resize-fill: resize the image to fill the screen but keep proportions. (default)\n"
         "    --fbdev                  Path to the framebuffer device to use to draw the background.\n"
+        "\n"
+        "-D, --no-detach              Dont't detach: waits for the screen to be unlocked before returning.\n"
         "\n"
         "-h, --help                   Display this help text.\n"
         "-v, --version                Display version information.\n",
@@ -147,13 +150,14 @@ struct options* options_parse(int argc, char** argv) {
     options->background = NULL;
     options->background_fill = RESIZE_FILL;
     options->fbdev = "/dev/fb0";
+    options->dont_detach = 0;
     options->show_help = 0;
     options->show_version = 0;
 
     // Args parsing
     int opt;
     int longopt_index;
-    while ((opt = getopt_long(argc, argv, "slku:m:dqb:hv", long_options, &longopt_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "slku:m:dqb:Dhv", long_options, &longopt_index)) != -1) {
         switch (opt) {
             case 's':
                 options->block_sysrequests = 0;
@@ -180,6 +184,9 @@ struct options* options_parse(int argc, char** argv) {
                 break;
             case 'b':
                 options->background = optarg;
+                break;
+            case 'D':
+                options->dont_detach = 1;
                 break;
             case 'h':
                 print_usage(argc, argv);

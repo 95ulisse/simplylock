@@ -57,14 +57,14 @@ static int user_selection(struct options* options, struct vt* vt, void* bg, char
         vt_flush(vt);
         vt_clear(vt);
         
-        // Background
-        if (bg != NULL) {
-            bg_paint(bg);
-        }
-
         // Switch on the screen if in dark mode
         if (options->dark_mode) {
             vt_blank(vt, 0);
+        }
+
+        // Background
+        if (bg != NULL) {
+            bg_paint(bg);
         }
 
         // Users list
@@ -102,12 +102,27 @@ static int user_selection(struct options* options, struct vt* vt, void* bg, char
     return 0;
 }
 
+static void repaint_console(struct options* options, struct vt* vt, void* bg, const char* user) {
+    vt_clear(vt);
+    vt_flush(vt);
+
+    if (bg != NULL) {
+        bg_paint(bg);
+    }
+
+    if (options->message != NULL) {
+        fprintf(stdout, "\n%s\n", options->message);
+    }
+    fprintf(stdout, "\nPress enter to unlock as " HIGHLIGHT "%s" RESET ". [Press Ctrl+C to change user] ", user);
+}
+
 int main(int argc, char** argv) {
     struct options* options;
     struct vt* vt;
     void* bg = NULL;
     char* user;
     int c;
+    int is_console_blanked = 0;
 
     // Parses the options
     options = options_parse(argc, argv);
@@ -190,6 +205,7 @@ int main(int argc, char** argv) {
         perror("vt_init");
         goto error;
     }
+    is_console_blanked = options->dark_mode;
 
     // Load the background image if requested
     if (options->background != NULL) {
@@ -230,17 +246,9 @@ int main(int argc, char** argv) {
 
     // The auth loop
     for (;;) {
-        vt_clear(vt);
-        vt_flush(vt);
-
-        if (bg != NULL) {
-            bg_paint(bg);
-        }
-
-        if (options->message != NULL) {
-            fprintf(stdout, "\n%s\n", options->message);
-        }
-        fprintf(stdout, "\nPress enter to unlock as " HIGHLIGHT "%s" RESET ". [Press Ctrl+C to change user] ", user);
+        
+        // Repaint the console
+        repaint_console(options, vt, bg, user);
 
         // Wait for enter to be pressed if not in quick mode.
         // If we are in quick mode, instead, jump directly to
@@ -268,6 +276,14 @@ int main(int argc, char** argv) {
             // Switch the screen back on before authentication
             if (options->dark_mode) {
                 vt_blank(vt, 0);
+
+                // Repaint the whole console
+                if (is_console_blanked) {
+                    repaint_console(options, vt, bg, user);
+                    fprintf(stdout, "\n");
+                }
+
+                is_console_blanked = 0;
             }
 
         } else {
@@ -284,6 +300,14 @@ int main(int argc, char** argv) {
         // the authentication failed.
         if (options->dark_mode) {
             vt_blank(vt, 0);
+
+            // Repaint the whole console
+            if (is_console_blanked) {
+                repaint_console(options, vt, bg, user);
+                fprintf(stdout, "\n");
+            }
+
+            is_console_blanked = 0;
         }
 
         fprintf(stdout, "\nAuthentication failed.\n");

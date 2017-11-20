@@ -11,7 +11,43 @@
 
 #include "vt.h"
 
+#define CONSOLEBLANK_PATH "/sys/module/kernel/parameters/consoleblank"
+
 static int console_fd = -1;
+
+
+
+static inline int set_console_blank_timer(struct vt* vt, int timer) {
+    return dprintf(vt->fd, "\033[9;%d]", timer);
+}
+
+static int ensure_console_blank_timer_enabled(struct vt* vt) {
+    int fd = open(CONSOLEBLANK_PATH, O_RDONLY);
+    if (fd < 0) {
+        return -1;
+    }
+
+    // Read the integer inside the file
+    char buf[20];
+    if (read(fd, buf, sizeof(buf)) < 0) {
+        return -1;
+    }
+
+    // Parse the integer and close the file
+    int ret = atoi(buf);
+    close(fd);
+
+    // If we have a 0 timer, set the timer to 1
+    if (ret == 0) {
+        if (set_console_blank_timer(vt, 1) < 0) {
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
+
+
 
 int vt_init() {
     while ((console_fd = open(VT_CONSOLE_DEVICE, O_RDWR)) == -1 && errno == EINTR);
@@ -163,8 +199,23 @@ int vt_clear(struct vt* vt) {
 }
 
 int vt_blank(struct vt* vt, int blank) {
+
+    // If the console blanking timer is disabled, the ioctl below will fail,
+    // so we need to enable it just for the time needed for the ioctl to work.
+    int need_console_blank_reset = 0;
+    if (blank && ensure_console_blank_timer_enabled(vt) == 0) {
+        need_console_blank_reset = 1;
+    }
+
     int arg = blank ? TIOCL_BLANKSCREEN : TIOCL_UNBLANKSCREEN;
-    return ioctl(vt->fd, TIOCLINUX, &arg);
+    int ret = ioctl(vt->fd, TIOCLINUX, &arg);
+
+    // Reset the console blanking timer if modified
+    if (need_console_blank_reset) {
+        set_console_blank_timer(vt, 0);
+    }
+
+    return ret;
 }
 
 int vt_signals(struct vt* vt, vt_signals_t sigs) {

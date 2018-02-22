@@ -6,7 +6,15 @@
 #include <unistd.h>
 #include <linux/fb.h>
 #include <sys/mman.h>
+
+#if MAGICKWAND_VERSION == 6
 #include <wand/MagickWand.h>
+#define MagickResizeImage(wand, w, h, filter) MagickResizeImage(wand, w, h, filter, 1)
+#elif MAGICKWAND_VERSION == 7
+#include <MagickWand/MagickWand.h>
+#else
+#error "Unsupported MagickWand version."
+#endif
 
 #include "bg.h"
 
@@ -52,7 +60,7 @@ static bool fill_image(struct bg* bg, enum background_fill_t fill) {
         
         case STRETCH:
             // Resize the image to match the screen size
-            if (MagickResizeImage(bg->m_wand, screen_w, screen_h, LanczosFilter, 1) == MagickFalse) {
+            if (MagickResizeImage(bg->m_wand, screen_w, screen_h, LanczosFilter) == MagickFalse) {
                 fprintf(stderr, "Error manipulating image.\n");
                 return false;
             }
@@ -70,7 +78,7 @@ static bool fill_image(struct bg* bg, enum background_fill_t fill) {
             int new_h = (int)(ratio * img_h);
 
             // Resize the image
-            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter, 1) == MagickFalse) {
+            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter) == MagickFalse) {
                 fprintf(stderr, "Error manipulating image.\n");
                 return false;
             }
@@ -97,7 +105,7 @@ static bool fill_image(struct bg* bg, enum background_fill_t fill) {
             int new_h = (int)(ratio * img_h);
 
             // Resize the image
-            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter, 1) == MagickFalse) {
+            if (MagickResizeImage(bg->m_wand, new_w, new_h, LanczosFilter) == MagickFalse) {
                 fprintf(stderr, "Error manipulating image.\n");
                 return false;
             }

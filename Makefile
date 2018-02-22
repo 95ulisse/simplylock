@@ -13,6 +13,9 @@ OBJECTS = $(OUT)/vt.o \
 		  $(OUT)/lock.o \
 		  $(OUT)/main.o
 
+# Add MagickWand version as a compile time constant
+CFLAGS += -DMAGICKWAND_VERSION=$(shell MagickWand-config --version | grep -oE '^[0-9]+')
+
 $(OUT)/%.o: $(SRC)/%.c
 	@mkdir -p $(OUT)
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<

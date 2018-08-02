@@ -270,21 +270,17 @@ int main(int argc, char** argv) {
                 perror("getchar");
                 goto error;
             }
-            fprintf(stdout, "\n");
             user_selection_enabled = 0;
 
             // Switch the screen back on before authentication
             if (options->dark_mode) {
                 vt_blank(vt, 0);
-
-                // Repaint the whole console
-                if (is_console_blanked) {
-                    repaint_console(options, vt, bg, user);
-                    fprintf(stdout, "\n");
-                }
-
                 is_console_blanked = 0;
             }
+
+            // Repaint the whole console
+            repaint_console(options, vt, bg, user);
+            fprintf(stdout, "\n");
 
         } else {
             options->quick_mode = 0;

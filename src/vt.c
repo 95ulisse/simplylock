@@ -12,6 +12,7 @@
 #include "vt.h"
 
 #define CONSOLEBLANK_PATH "/sys/module/kernel/parameters/consoleblank"
+#define MIN_VT_NUMBER 13
 
 static int console_fd = -1;
 
@@ -88,22 +89,111 @@ struct vt* vt_createnew() {
     if (vt == NULL) {
         return NULL;
     }
+    vt->fd = -1;
 
     // First we find an available vt
     int ret;
-    while ((ret = ioctl(console_fd, VT_OPENQRY, &vt->number)) == -1 && errno == EINTR);
+    int num;
+    while ((ret = ioctl(console_fd, VT_OPENQRY, &num)) == -1 && errno == EINTR);
     if (ret < 0) {
         goto error;
     }
 
-    // Then we open the corresponding device file
-    char path[1024];
-    snprintf(path, sizeof(path), VT_TTY_FORMAT, vt->number);
-    while ((vt->stream = fopen(path, "r+")) == NULL && errno == EINTR);
-    if (vt->stream == NULL) {
-        goto error;
+    // If we got a low vt number, start searching for the higher ones.
+    // This is because a vt might be actually free, but systemd-logind is managing it,
+    // and we don't want to step on systemd, otherwise bad things will happen.
+    // We chose 13 as the lower limit because the user can manually switch up to vt number 12.
+    // On most systems, the maximum number of vts is 64, so this should not be a problem.
+    if (num < MIN_VT_NUMBER) {
+        num = MIN_VT_NUMBER;
+       
+        // Fast path: the kernel provides a quick way to get the state of the first 16 vts
+        // by returning a mask with 1s indicating the ones in use.
+        struct vt_stat stat;
+        int ret;
+        while ((ret = ioctl(console_fd, VT_GETSTATE, &stat)) == -1 && errno == EINTR);
+        if (ret < 0) {
+            goto error;
+        }
+
+        int found = 0;
+        for (unsigned short mask = 1 << num; num < 16; ++num, mask <<= 1) {
+            if ((stat.v_state & mask) == 0) {
+                found = 1;
+                break;
+            }
+        }
+
+        // Slow path: we might be unlucky, and all the first 16 vts are already occupied.
+        // This should never happen in a real case, but better safe than sorry.
+        //
+        // Here the kernel does not help us and we have to test each single vt one by one:
+        // by issuing a VT_OPENQRY ioctl we can get back the first free vt.
+        // We keep opening file descriptors until the next free vt is greater than MIN_VT_NUMBER.
+        //
+        // I don't have words to describe how ugly and problematic this is,
+        // but it's the only stable working solution I found. I seriously hope that this will never be needed.
+        if (!found) {
+            
+            // Keep track of the fds we open
+            int fds[MAX_NR_CONSOLES];
+            for (int i = 0; i < MAX_NR_CONSOLES; ++i) {
+                fds[i] = -1;
+            }
+
+            int first_free = 0;
+            char path[1024];
+            do {
+
+                // Ask for the first free
+                int ret;
+                while ((ret = ioctl(console_fd, VT_OPENQRY, &first_free)) == -1 && errno == EINTR);
+                if (ret < 0) {
+                    goto error;
+                }
+
+                // Open the corresponding device file to mark it as busy
+                snprintf(path, sizeof(path), VT_TTY_FORMAT, first_free);
+                while ((ret = open(path, O_RDWR)) == -1 && errno == EINTR);
+                if (ret < 0) {
+                    goto error;
+                }
+                fds[first_free] = ret;
+
+            } while (first_free < num);
+
+            // We did it!
+            num = first_free;
+            vt->fd = fds[num];
+
+            // Now clean up
+            for (int i = 0; i < MAX_NR_CONSOLES; ++i) {
+                if (i != num && fds[i] != -1) {
+                    close(fds[i]);
+                }
+            }
+
+        }
+
     }
-    vt->fd = fileno(vt->stream);
+    vt->number = num;
+
+    // Then we open the corresponding device file
+    if (vt->fd == -1) {
+        char path[1024];
+        snprintf(path, sizeof(path), VT_TTY_FORMAT, vt->number);
+        while ((vt->stream = fopen(path, "r+")) == NULL && errno == EINTR);
+        if (vt->stream == NULL) {
+            goto error;
+        }
+        vt->fd = fileno(vt->stream);
+    } else {
+        // Reuse the same fd we found during the slow path of the previous check
+        while ((vt->stream = fdopen(vt->fd, "r+")) == NULL && errno == EINTR);
+        if (vt->stream == NULL) {
+            goto error;
+        }
+    }
 
     // And get terminal attributes
     while ((ret = tcgetattr(vt->fd, &vt->term)) == -1 && errno == EINTR);

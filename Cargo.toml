@@ -1,0 +1,13 @@
+[package]
+name = "simplylock"
+version = "0.7.0"
+description = "A simple and lightweight Linux console locking tool."
+authors = ["Marco Cameriero <me@marcocameriero.net>"]
+edition = "2018"
+license = "MIT"
+repository = "https://github.com/95ulisse/simplylock"
+homepage = "https://github.com/95ulisse/simplylock"
+readme = "README.md"
+
+[dependencies]
+structopt = "0.3.0"

@@ -31,7 +31,7 @@ pub struct Opt {
 
     /// Keep sysrequests enabled
     #[structopt(short = "s", long)]
-    pub no_sysreq: bool,
+    pub no_sysrq: bool,
 
     /// Do not lock terminal switching
     #[structopt(short = "l", long)]

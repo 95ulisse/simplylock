@@ -2,14 +2,24 @@ mod error;
 mod options;
 mod lock;
 
+use std::io::Write;
 use failure::Fail;
 use crate::error::*;
 
 fn run() -> Result<()> {
     let opt = options::parse();
+    
     let console = vt::Console::open().context(ErrorKind::Message("Cannot open console device file"))?;
-    let lock = lock::Lock::with_options(&opt, &console)?;
-    println!("{:#?}", opt);
+    
+    let mut lock = lock::Lock::with_options(&opt, &console)?;
+    
+    let vt = lock.vt_mut();
+    vt.clear();
+    write!(vt, "{:#?}", opt);
+    vt.flush();
+
+    std::thread::sleep(std::time::Duration::from_secs(10));
+    
     Ok(())
 }
 

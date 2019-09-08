@@ -120,13 +120,8 @@ impl<'a> Lock<'a> {
 
     }
 
-    /// Returns a reference to the [`Vt`](vt::Vt) used to lock the station.
-    pub fn vt(&self) -> &Vt<'a> {
-        &self.lock_vt
-    }
-
     /// Returns a mutable reference to the [`Vt`](vt::Vt) used to lock the station.
-    pub fn vt_mut(&mut self) -> &mut Vt<'a> {
+    pub fn vt(&mut self) -> &mut Vt<'a> {
         &mut self.lock_vt
     }
 

@@ -1,11 +1,12 @@
 use std::ffi::{CString, CStr};
-use std::io::{Write, BufRead};
+use std::io::{self, Read, Write};
 use std::{mem, ptr};
 use std::os::unix::prelude::*;
 use nix::libc::{c_int, c_void, calloc, free, size_t, strdup};
 use nix::unistd::isatty;
 use nix::sys::termios::{Termios, LocalFlags, SetArg, tcgetattr, tcsetattr};
 use pam_sys::{PamHandle, PamConversation, PamMessage, PamMessageStyle, PamResponse, PamReturnCode};
+use vt::Vt;
 use crate::error::*;
 
 const PAM_SERVICE_NAME: &str = "simplylock";
@@ -136,10 +137,10 @@ impl Converse for StdioConverse {
         
         // Print prompt
         print!("{}", msg.to_string_lossy());
-        ::std::io::stdout().flush().map_err(|_| ())?;
+        io::stdout().flush().map_err(|_| ())?;
         
         // Switch off echo if required
-        let stdin_fd = ::std::io::stdin().as_raw_fd();
+        let stdin_fd = io::stdin().as_raw_fd();
         let mut termios: Option<Termios> = None;
         if blind && isatty(stdin_fd).map_err(|_| ())? {
             let mut t = tcgetattr(stdin_fd).map_err(|_| ())?;
@@ -149,10 +150,7 @@ impl Converse for StdioConverse {
         }
 
         // Read line
-        let mut line = String::new();
-        let stdin = ::std::io::stdin();
-        stdin.lock().read_line(&mut line).unwrap();
-        let line_without_delimiter = line.trim_end_matches('\n');
+        let line = read_line(&mut io::stdin().lock())?;
 
         // Switch echo back on
         if let Some(mut t) = termios {
@@ -163,7 +161,7 @@ impl Converse for StdioConverse {
             println!();
         }
 
-        CString::new(line_without_delimiter).map_err(|_| ())
+        CString::new(line).map_err(|_| ())
     }
     
     fn info(&mut self, msg: &CStr) {
@@ -171,9 +169,96 @@ impl Converse for StdioConverse {
     }
     
     fn error(&mut self, msg: &CStr) {
-        println!("{}", msg.to_string_lossy());
+        self.info(msg);
     }
 
+}
+
+/// Implementation of [`Converse`](crate::auth::Converse) that uses a [`Vt`](vt::Vt) for I/O.
+pub struct VtConverse<'a, 'b> {
+    vt: &'b mut Vt<'a>
+}
+
+impl<'a, 'b> VtConverse<'a, 'b>
+    where 'a: 'b
+{
+
+    /// Creates a new `VtConverse` that will use the given `Vt` for I/O.
+    pub fn new(vt: &'b mut Vt<'a>) -> VtConverse<'a, 'b> {
+        VtConverse { vt }
+    }
+
+}
+
+impl<'a, 'b> Converse for VtConverse<'a, 'b>
+    where 'a: 'b
+{
+
+    fn prompt(&mut self, msg: &CStr, blind: bool) -> ::std::result::Result<CString, ()> {
+        
+        // Print prompt
+        write!(self.vt, "{}", msg.to_string_lossy())
+            .and_then(|_| self.vt.flush())
+            .map_err(|_| ())?;
+
+        // Switch off echo if required
+        if blind {
+            self.vt.echo(false).map_err(|_| ())?;
+        }
+
+        // Read line
+        let line = read_line(&mut self.vt)?;
+
+        // Switch echo back on
+        if blind {
+            self.vt.echo(true).map_err(|_| ())?;
+
+            // Append manually a newline
+            writeln!(self.vt)
+                .and_then(|_| self.vt.flush())
+                .map_err(|_| ())?;
+        }
+
+        CString::new(line).map_err(|_| ())
+
+    }
+
+    fn info(&mut self, msg: &CStr) {
+        writeln!(self.vt, "{}", msg.to_string_lossy())
+            .and_then(|_| self.vt.flush());
+    }
+    
+    fn error(&mut self, msg: &CStr) {
+        self.info(msg);
+    }
+
+}
+
+/// Reads a line from a `Read`. The newline character is not included.
+fn read_line<R: Read>(read: &mut R) -> ::std::result::Result<String, ()> {
+    let mut line = String::new();
+    let mut buf = [0u8];
+    loop {
+        match read.read_exact(&mut buf) {
+            Err(e) => {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    // Treat EOF as a newline and move on
+                    buf[0] = b'\n';
+                } else {
+                    return Err(())
+                }
+            },
+            Ok(()) => ()
+        }
+
+        if buf[0] == b'\n' {
+            break;
+        } else {
+            line.push(buf[0].into());
+        }
+    }
+
+    Ok(line)
 }
 
 /// Creates a user-friendly error message from a PAM error code.

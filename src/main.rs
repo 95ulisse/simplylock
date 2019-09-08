@@ -3,26 +3,25 @@ mod options;
 mod lock;
 mod auth;
 
+use std::io::{Write};
 use failure::Fail;
 use crate::error::*;
 
 fn run() -> Result<()> {
-    /*let opt = options::parse();
+    let opt = options::parse();
     
     let console = vt::Console::open().context(ErrorKind::Message("Cannot open console device file"))?;
     
     let mut lock = lock::Lock::with_options(&opt, &console)?;
     
-    let vt = lock.vt_mut();
-    vt.clear();
-    write!(vt, "{:#?}", opt);
-    vt.flush();
-
-    std::thread::sleep(std::time::Duration::from_secs(5));*/
+    let vt = lock.vt();
+    vt.clear().context(ErrorKind::Io)?;
+    writeln!(vt, "{:#?}", opt).context(ErrorKind::Io)?;
+    vt.flush().context(ErrorKind::Io)?;
 
     unsafe { nix::libc::clearenv(); }
 
-    auth::authenticate_user("marco", auth::StdioConverse::new())?;
+    auth::authenticate_user("marco", auth::VtConverse::new(vt))?;
 
     Ok(())
 }

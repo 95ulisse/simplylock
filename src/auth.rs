@@ -124,16 +124,8 @@ extern "C" fn conversation_function<C: Converse>(
 
 /// Common implementation of the [`Converse`](crate::auth::Converse) trait using stdin/stdout
 /// to interface with the user.
+#[allow(dead_code)]
 pub struct StdioConverse;
-
-impl StdioConverse {
-
-    /// Creates a new `StdioConverse`.
-    pub fn new() -> StdioConverse {
-        StdioConverse {}
-    }
-
-}
 
 impl Converse for StdioConverse {
     

@@ -79,6 +79,8 @@ pub enum ErrorKind {
     Path(DisplayPath<'static>),
     #[fail(display = "I/O error")]
     Io,
+    #[fail(display = "PAM error: {}", _0)]
+    Pam(String),
     #[fail(display = "Error parsing value")]
     Parse,
     #[fail(display = "{}", _0)]

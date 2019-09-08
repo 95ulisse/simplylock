@@ -22,11 +22,11 @@ pub trait Converse {
 
     /// Incoming informational message from PAM.
     /// No response is expected.
-    fn info(&mut self, msg: &CStr);
+    fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()>;
 
     /// Incoming error message from PAM.
     /// No response is expected.
-    fn error(&mut self, msg: &CStr);
+    fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()>;
 
 }
 
@@ -72,10 +72,14 @@ extern "C" fn conversation_function<C: Converse>(
                     }
                 }
                 PamMessageStyle::ERROR_MSG => {
-                    handler.error(msg);
+                    if handler.error(msg).is_err() {
+                        result = PamReturnCode::CONV_ERR;
+                    }
                 }
                 PamMessageStyle::TEXT_INFO => {
-                    handler.info(msg);
+                    if handler.info(msg).is_err() {
+                        result = PamReturnCode::CONV_ERR;
+                    }
                 }
             }
 
@@ -164,12 +168,13 @@ impl Converse for StdioConverse {
         CString::new(line).map_err(|_| ())
     }
     
-    fn info(&mut self, msg: &CStr) {
+    fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
         println!("{}", msg.to_string_lossy());
+        Ok(())
     }
     
-    fn error(&mut self, msg: &CStr) {
-        self.info(msg);
+    fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()>{
+        self.info(msg)
     }
 
 }
@@ -223,13 +228,14 @@ impl<'a, 'b> Converse for VtConverse<'a, 'b>
 
     }
 
-    fn info(&mut self, msg: &CStr) {
+    fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
         writeln!(self.vt, "{}", msg.to_string_lossy())
-            .and_then(|_| self.vt.flush());
+            .and_then(|_| self.vt.flush())
+            .map_err(|_| ())
     }
     
-    fn error(&mut self, msg: &CStr) {
-        self.info(msg);
+    fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
+        self.info(msg)
     }
 
 }

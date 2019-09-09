@@ -192,28 +192,23 @@ impl<'a, 'b> Converse for VtConverse<'a, 'b>
 {
 
     fn prompt(&mut self, msg: &CStr, blind: bool) -> ::std::result::Result<CString, ()> {
-        
-        // Print prompt
-        write!(self.vt, "{}", msg.to_string_lossy())
-            .and_then(|_| self.vt.flush())
-            .map_err(|_| ())?;
 
-        // Switch off echo if required
-        if blind {
-            self.vt.echo(false).map_err(|_| ())?;
-        }
+        // Print prompt
+        write!(self.vt, "{}", msg.to_string_lossy()).map_err(|_| ())?;
+        
+        // Switch on or off echo as required
+        let original_echo = self.vt.get_echo().map_err(|_| ())?;
+        self.vt.echo(!blind).map_err(|_| ())?;
 
         // Read line
         let line = read_line(&mut self.vt)?;
 
-        // Switch echo back on
-        if blind {
-            self.vt.echo(true).map_err(|_| ())?;
+        // Reset echo
+        self.vt.echo(original_echo).map_err(|_| ())?;
 
-            // Append manually a newline
-            writeln!(self.vt)
-                .and_then(|_| self.vt.flush())
-                .map_err(|_| ())?;
+        // Append manually a newline
+        if blind {
+            writeln!(self.vt).map_err(|_| ())?;
         }
 
         CString::new(line).map_err(|_| ())
@@ -221,9 +216,7 @@ impl<'a, 'b> Converse for VtConverse<'a, 'b>
     }
 
     fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
-        writeln!(self.vt, "{}", msg.to_string_lossy())
-            .and_then(|_| self.vt.flush())
-            .map_err(|_| ())
+        writeln!(self.vt, "{}", msg.to_string_lossy()).map_err(|_| ())
     }
     
     fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
@@ -268,7 +261,7 @@ fn create_pam_error(code: PamReturnCode) -> Error {
 }
 
 /// Authenticates the user with the given name using PAM.
-pub fn authenticate_user<C: Converse>(user: &str, converse: C) -> Result<()> {
+pub fn authenticate_user<C: Converse>(user: &str, converse: C) -> Result<bool> {
 
     let mut converse = Box::new(converse);
     let conv = PamConversation {
@@ -287,22 +280,22 @@ pub fn authenticate_user<C: Converse>(user: &str, converse: C) -> Result<()> {
 
     // Authentication
     code = pam_sys::authenticate(handle, pam_sys::PamFlag::NONE);
-    if code != PamReturnCode::SUCCESS {
-        return Err(create_pam_error(code));
-    }
 
     // Authorization
-    code = pam_sys::acct_mgmt(handle, pam_sys::PamFlag::NONE);
-    if code != PamReturnCode::SUCCESS {
-        return Err(create_pam_error(code));
+    if code == PamReturnCode::SUCCESS {
+        code = pam_sys::acct_mgmt(handle, pam_sys::PamFlag::NONE);
     }
 
     // End pam transaction
+    let auth_code = code;
     code = pam_sys::end(handle, code);
+    
     if code != PamReturnCode::SUCCESS {
-        return Err(create_pam_error(code));
+        Err(create_pam_error(code))
+    } else if auth_code != PamReturnCode::SUCCESS && auth_code != PamReturnCode::AUTH_ERR {
+        Err(create_pam_error(auth_code))
+    } else {
+        Ok(auth_code == PamReturnCode::SUCCESS)
     }
-
-    Ok(())
 
 }

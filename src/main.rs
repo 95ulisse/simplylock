@@ -5,9 +5,6 @@ mod auth;
 
 use std::io::{Write, Read};
 use std::time::Duration;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use nix::sys::signal::{Signal, SigSet};
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{Uid, Gid, ForkResult, geteuid, setresuid, setresgid, setsid, fork};
 use failure::Fail;
@@ -15,11 +12,6 @@ use vt::{Vt, VtSignals, VtFlushType};
 use colored::*;
 use crate::error::*;
 use crate::options::Opt;
-
-fn user_selection(opt: &Opt, vt: &mut Vt, user: &mut &str) -> Result<()> {
-    writeln!(vt, "{}", "User selection!".red()).context(ErrorKind::Io)?;
-    Ok(())
-}
 
 fn repaint_console(opt: &Opt, vt: &mut Vt, user: &str) -> Result<()> {
     
@@ -50,16 +42,6 @@ fn run() -> Result<i32> {
     setresgid(Gid::from_raw(0), Gid::from_raw(0), Gid::from_raw(0))
         .and_then(|_| setresuid(Uid::from_raw(0), Uid::from_raw(0), Uid::from_raw(0)))
         .context(ErrorKind::Message("Cannot setresuid/setresgid root"))?;
-
-    // Block all the signals with the exception of SIGINT
-    let mut sigset = SigSet::all();
-    sigset.remove(Signal::SIGINT);
-    sigset.thread_set_mask().context(ErrorKind::Message("pthread_setmask"))?;
-
-    // Register a handler for SIGINT which sets a flag when invoked
-    let is_user_selection_requested = Arc::new(AtomicBool::new(false));
-    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&is_user_selection_requested))
-        .context(ErrorKind::Message("Failed signal handler registration"))?;
 
     // Now we fork and move to a new session so that we can be the
     // foreground process for the new terminal to be created
@@ -104,11 +86,8 @@ fn run() -> Result<i32> {
     unsafe { nix::libc::clearenv(); }
 
     // The auth loop
-    let mut user = &opt.users.first().unwrap()[..];
-    'outer: loop {
-
-        // Reset the flag for the user selection
-        is_user_selection_requested.store(false, Ordering::Relaxed);
+    let user = &opt.users.first().unwrap()[..];
+    loop {
 
         // Repaint the console
         repaint_console(&opt, vt, user)?;
@@ -127,16 +106,7 @@ fn run() -> Result<i32> {
             let mut buf = [0u8];
             loop {
                 match vt.read(&mut buf) {
-                    Err(e) => {
-                        if e.kind() == std::io::ErrorKind::Interrupted {
-                            if is_user_selection_requested.load(Ordering::Relaxed) {
-                                user_selection(&opt, vt, &mut user)?;
-                                continue 'outer;
-                            }
-                        } else {
-                            return Err(e.context(ErrorKind::Io).into());
-                        }
-                    },
+                    Err(e) => return Err(e.context(ErrorKind::Io).into()),
                     Ok(0) => return Err(Error::from(ErrorKind::Message("Unexpected EOF")).context(ErrorKind::Io).into()),
                     Ok(1) => {
                         if buf[0] == b'\n' {

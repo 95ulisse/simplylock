@@ -197,14 +197,14 @@ impl<'a, 'b> Converse for VtConverse<'a, 'b>
         write!(self.vt, "{}", msg.to_string_lossy()).map_err(|_| ())?;
         
         // Switch on or off echo as required
-        let original_echo = self.vt.get_echo().map_err(|_| ())?;
-        self.vt.echo(!blind).map_err(|_| ())?;
+        let original_echo = self.vt.is_echo_enabled();
+        self.vt.set_echo(!blind).map_err(|_| ())?;
 
         // Read line
         let line = read_line(&mut self.vt)?;
 
         // Reset echo
-        self.vt.echo(original_echo).map_err(|_| ())?;
+        self.vt.set_echo(original_echo).map_err(|_| ())?;
 
         // Append manually a newline
         if blind {

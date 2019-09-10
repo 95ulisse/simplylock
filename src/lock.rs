@@ -2,7 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use atoi::atoi;
-use vt::{Console, Vt};
+use vt::{Console, Vt, VtNumber};
 use crate::options::Opt;
 use crate::error::*;
 
@@ -13,7 +13,7 @@ const PRINTK_PATH: &str = "/proc/sys/kernel/printk";
 /// and we don't want to step on systemd, otherwise bad things will happen.
 /// We chose 13 as the lower limit because the user can manually switch up to vt number 12.
 /// On most systems, the maximum number of vts is 16 or 64, so this should not be a problem.
-const MIN_VT_NUMBER: u16 = 13;
+const MIN_VT_NUMBER: i32 = 13;
 
 fn read_u32_from_file<P>(path: P) -> Result<u32>
     where P: AsRef<Path>
@@ -45,7 +45,7 @@ fn write_u32_to_file<P>(path: P, data: u32) -> Result<()>
 /// Lock the station by calling [`Lock::with_options`](crate::lock::Lock::with_options).
 pub struct Lock<'a> {
     console: &'a Console,
-    original_vt: Vt<'a>,
+    original_vt: VtNumber,
     original_sysrq: Option<u32>,
     original_printk: Option<u32>,
     lock_vt: Vt<'a>,
@@ -62,7 +62,7 @@ impl<'a> Lock<'a> {
     pub fn with_options(opt: &Opt, console: &'a Console) -> Result<Lock<'a>> {
 
         // Save the current vt and allocate a new one
-        let original_vt = console.current_vt()
+        let original_vt = console.current_vt_number()
             .context(ErrorKind::Message("Cannot get current terminal"))?;
         let mut lock_vt = console.new_vt_with_minimum_number(MIN_VT_NUMBER)
             .context(ErrorKind::Message("Cannot allocate new terminal"))?;
@@ -143,7 +143,7 @@ impl<'a> Drop for Lock<'a> {
         }
 
         // Switch to the original vt
-        let _ = self.original_vt.switch();
+        let _ = self.console.switch_to(self.original_vt);
 
         // Restore the original state of sysrq and printk
         if let Some(value) = self.original_sysrq {

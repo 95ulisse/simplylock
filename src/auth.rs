@@ -1,11 +1,11 @@
+use std::cell::RefCell;
 use std::ffi::{CString, CStr};
-use std::io::{self, Read, Write};
+use std::io::Write;
 use std::{mem, ptr};
-use std::os::unix::prelude::*;
+use std::rc::Rc;
 use nix::libc::{c_int, c_void, calloc, free, size_t, strdup};
-use nix::unistd::isatty;
-use nix::sys::termios::{Termios, LocalFlags, SetArg, tcgetattr, tcsetattr};
 use pam_sys::{PamHandle, PamConversation, PamMessage, PamMessageStyle, PamResponse, PamReturnCode};
+use termion::input::TermRead;
 use vt::Vt;
 use crate::error::*;
 
@@ -122,134 +122,52 @@ extern "C" fn conversation_function<C: Converse>(
     result as c_int
 }
 
-/// Common implementation of the [`Converse`](crate::auth::Converse) trait using stdin/stdout
-/// to interface with the user.
-#[allow(dead_code)]
-pub struct StdioConverse;
-
-impl Converse for StdioConverse {
-    
-    fn prompt(&mut self, msg: &CStr, blind: bool) -> ::std::result::Result<CString, ()> {
-        
-        // Print prompt
-        print!("{}", msg.to_string_lossy());
-        io::stdout().flush().map_err(|_| ())?;
-        
-        // Switch off echo if required
-        let stdin_fd = io::stdin().as_raw_fd();
-        let mut termios: Option<Termios> = None;
-        if blind && isatty(stdin_fd).map_err(|_| ())? {
-            let mut t = tcgetattr(stdin_fd).map_err(|_| ())?;
-            t.local_flags &= !(LocalFlags::ECHO);
-            tcsetattr(stdin_fd, SetArg::TCSANOW, &t).map_err(|_| ())?;
-            termios = Some(t);
-        }
-
-        // Read line
-        let line = read_line(&mut io::stdin().lock())?;
-
-        // Switch echo back on
-        if let Some(mut t) = termios {
-            t.local_flags |= LocalFlags::ECHO;
-            tcsetattr(stdin_fd, SetArg::TCSANOW, &t).map_err(|_| ())?;
-
-            // Append manually a newline
-            println!();
-        }
-
-        CString::new(line).map_err(|_| ())
-    }
-    
-    fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
-        println!("{}", msg.to_string_lossy());
-        Ok(())
-    }
-    
-    fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()>{
-        self.info(msg)
-    }
-
-}
-
 /// Implementation of [`Converse`](crate::auth::Converse) that uses a [`Vt`](vt::Vt) for I/O.
-pub struct VtConverse<'a, 'b> {
-    vt: &'b mut Vt<'a>
+pub struct VtConverse<'a> {
+    vt: Rc<RefCell<Vt<'a>>>
 }
 
-impl<'a, 'b> VtConverse<'a, 'b>
-    where 'a: 'b
-{
+impl<'a> VtConverse<'a> {
 
     /// Creates a new `VtConverse` that will use the given `Vt` for I/O.
-    pub fn new(vt: &'b mut Vt<'a>) -> VtConverse<'a, 'b> {
+    pub fn new(vt: Rc<RefCell<Vt<'a>>>) -> VtConverse<'a> {
         VtConverse { vt }
     }
 
 }
 
-impl<'a, 'b> Converse for VtConverse<'a, 'b>
-    where 'a: 'b
-{
+impl<'a> Converse for VtConverse<'a> {
 
-    fn prompt(&mut self, msg: &CStr, blind: bool) -> ::std::result::Result<CString, ()> {
+    fn prompt(&mut self, msg: &CStr, _blind: bool) -> ::std::result::Result<CString, ()> {
 
         // Print prompt
-        write!(self.vt, "{}", msg.to_string_lossy()).map_err(|_| ())?;
+        write!(self.vt.borrow_mut(), "{}", msg.to_string_lossy()).map_err(|_| ())?;
         
-        // Switch on or off echo as required
-        let original_echo = self.vt.is_echo_enabled();
-        self.vt.set_echo(!blind).map_err(|_| ())?;
-
         // Read line
-        let line = read_line(&mut self.vt)?;
-
-        // Reset echo
-        self.vt.set_echo(original_echo).map_err(|_| ())?;
+        let line = self.vt.borrow_mut().read_line().map_err(|_| ())?.unwrap_or_else(String::new);
 
         // Append manually a newline
-        if blind {
-            writeln!(self.vt).map_err(|_| ())?;
-        }
+        write!(self.vt.borrow_mut(), "\n\r").map_err(|_| ())?;
 
         CString::new(line).map_err(|_| ())
 
     }
 
     fn info(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
-        writeln!(self.vt, "{}", msg.to_string_lossy()).map_err(|_| ())
+        write!(self.vt.borrow_mut(),
+               "{}\n\r",
+               msg.to_string_lossy()).map_err(|_| ())
     }
     
     fn error(&mut self, msg: &CStr) -> ::std::result::Result<(), ()> {
-        self.info(msg)
+        write!(self.vt.borrow_mut(),
+               "{}{}{}{}\n\r",
+               termion::style::Bold,
+               termion::color::Fg(termion::color::Red),
+               msg.to_string_lossy(),
+               termion::style::Reset).map_err(|_| ())
     }
 
-}
-
-/// Reads a line from a `Read`. The newline character is not included.
-fn read_line<R: Read>(read: &mut R) -> ::std::result::Result<String, ()> {
-    let mut line = String::new();
-    let mut buf = [0u8];
-    loop {
-        match read.read_exact(&mut buf) {
-            Err(e) => {
-                if e.kind() == io::ErrorKind::UnexpectedEof {
-                    // Treat EOF as a newline and move on
-                    buf[0] = b'\n';
-                } else {
-                    return Err(())
-                }
-            },
-            Ok(()) => ()
-        }
-
-        if buf[0] == b'\n' {
-            break;
-        } else {
-            line.push(buf[0].into());
-        }
-    }
-
-    Ok(line)
 }
 
 /// Creates a user-friendly error message from a PAM error code.

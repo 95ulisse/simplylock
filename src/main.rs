@@ -3,27 +3,39 @@ mod options;
 mod lock;
 mod auth;
 
-use std::io::{Write, Read};
+use std::io::Write;
 use std::time::Duration;
+use std::rc::Rc;
+use failure::Fail;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{Uid, Gid, ForkResult, geteuid, setresuid, setresgid, setsid, fork};
-use failure::Fail;
-use vt::{Vt, VtSignals, VtFlushType};
-use colored::*;
+use vt::VtFlushType;
+use termion::event::Key;
 use crate::error::*;
 use crate::options::Opt;
 
-fn repaint_console(opt: &Opt, vt: &mut Vt, user: &str) -> Result<()> {
+fn repaint_console<W: Write>(opt: &Opt, vt: &mut W, user: &str) -> Result<()> {
     
     // Clear the terminal
-    vt.clear().context(ErrorKind::Io)?;
-    vt.flush_buffers(VtFlushType::Both).context(ErrorKind::Io)?;
+    write!(vt, "{}", termion::clear::All).context(ErrorKind::Io)?;
 
     // Print the unlock message
+    let mut line = 2;
     if let Some(ref message) = opt.message {
-        writeln!(vt, "\n{}", message).context(ErrorKind::Io)?;
+        writeln!(vt,
+                 "{}{}",
+                 termion::cursor::Goto(1, line),
+                 message).context(ErrorKind::Io)?;
+        line += 2;
     }
-    write!(vt, "\nPress enter to unlock as {}. [Press Ctrl+C to change user] ", user.bold().blue()).context(ErrorKind::Io)?;
+    write!(vt,
+           "{}Press enter to unlock as {}{}{}{}. [Press Ctrl+C to change user] ",
+           termion::cursor::Goto(1, line),
+           termion::style::Bold,
+           termion::color::Fg(termion::color::LightBlue),
+           user,
+           termion::style::Reset
+           ).context(ErrorKind::Io)?;
 
     Ok(())
 }
@@ -77,20 +89,21 @@ fn run() -> Result<i32> {
     
     // Lock station
     let mut lock = lock::Lock::with_options(&opt, &console)?;
-
-    // Enable Ctrl+C on the terminal
-    let vt: &mut Vt = lock.vt();
-    vt.signals(VtSignals::SIGINT).context(ErrorKind::Io)?;
     
     // We clear the environment to avoid any possible interaction with PAM modules
     unsafe { nix::libc::clearenv(); }
 
     // The auth loop
+    let vt = lock.vt();
+    let (mut reader, writer) = lock.get_reader_writer();
     let user = &opt.users.first().unwrap()[..];
     loop {
 
+        // Flush the terminal buffers
+        vt.borrow_mut().flush_buffers(VtFlushType::Both).context(ErrorKind::Io)?;
+
         // Repaint the console
-        repaint_console(&opt, vt, user)?;
+        repaint_console(&opt, writer, user)?;
 
         // Wait for enter to be pressed if not in quick mode.
         // If we are in quick mode, instead, jump directly to
@@ -103,47 +116,47 @@ fn run() -> Result<i32> {
         if !opt.quick {
 
             // Wait for enter
-            let mut buf = [0u8];
-            loop {
-                match vt.read(&mut buf) {
-                    Err(e) => return Err(e.context(ErrorKind::Io).into()),
-                    Ok(0) => return Err(Error::from(ErrorKind::Message("Unexpected EOF")).context(ErrorKind::Io).into()),
-                    Ok(1) => {
-                        if buf[0] == b'\n' {
-                            // We finally got an enter!
-                            break;
-                        }
+            for c in &mut reader {
+                match c.context(ErrorKind::Io)? {
+                    Key::Char('\n') => {
+                        break;
                     },
-                    Ok(_) => unreachable!()
+                    Key::Ctrl('c') => {
+                        write!(writer,
+                               "{}<C-c>{}",
+                               termion::color::Fg(termion::color::LightGreen),
+                               termion::style::Reset).context(ErrorKind::Io)?;
+                    },
+                    _ => {}
                 }
             }
 
             // Switch the screen back on during authentication
             if opt.dark {
-                vt.blank(false).context(ErrorKind::Io)?;
+                vt.borrow_mut().blank(false).context(ErrorKind::Io)?;
             }
 
             // Repaint the console
-            repaint_console(&opt, vt, user)?;
-            writeln!(vt).context(ErrorKind::Io)?;
+            repaint_console(&opt, writer, user)?;
 
         } else {
             opt.quick = false;
-            writeln!(vt).context(ErrorKind::Io)?;
         }
 
+        write!(writer, "\n\r").context(ErrorKind::Io)?;
+
         // Try to authenticate the user
-        if auth::authenticate_user(user, auth::VtConverse::new(vt))? {
+        if auth::authenticate_user(user, auth::VtConverse::new(Rc::clone(&vt)))? {
             break;
         }
 
         // Switch the screen back on to be sure that the user knows
         // the authentication failed.
         if opt.dark {
-            vt.blank(false).context(ErrorKind::Io)?;
+            vt.borrow_mut().blank(false).context(ErrorKind::Io)?;
         }
 
-        writeln!(vt, "\nAuthentication failed.").context(ErrorKind::Io)?;
+        writeln!(writer, "\nAuthentication failed.").context(ErrorKind::Io)?;
         ::std::thread::sleep(Duration::from_secs(3));
     }
 

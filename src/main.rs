@@ -3,7 +3,8 @@ mod options;
 mod lock;
 mod auth;
 
-use std::io::Write;
+use std::cmp::min;
+use std::io::{self, Write};
 use std::time::Duration;
 use std::rc::Rc;
 use failure::Fail;
@@ -13,6 +14,62 @@ use vt::VtFlushType;
 use termion::event::Key;
 use crate::error::*;
 use crate::options::Opt;
+
+fn user_selection<'a, W, R>(users: &'a [String], current_user: &'a String, vt: &mut W, input: &mut R) -> Result<&'a String>
+    where W: Write,
+          R: Iterator<Item = io::Result<termion::event::Key>>
+{
+    
+    let mut current_index = users.iter().position(|x| x == current_user).unwrap();
+    'outer: loop {
+
+        // Clear the terminal
+        write!(vt, "{}", termion::clear::All).context(ErrorKind::Io)?;
+
+        // A nice message with the list of users allowed to unlock
+        write!(vt,
+            "{}The following users are unthorized to unlock:{}",
+            termion::cursor::Goto(1, 2),
+            termion::cursor::Goto(1, 4)).context(ErrorKind::Io)?;
+        for (i, u) in users.iter().enumerate() {
+            if current_index == i {
+                write!(vt,
+                       "{}{}- {}{}\n\r",
+                       termion::style::Bold,
+                       termion::color::Fg(termion::color::LightBlue),
+                       u,
+                       termion::style::Reset).context(ErrorKind::Io)?;
+            } else {
+                write!(vt, "- {}\n\r", u).context(ErrorKind::Io)?;
+            }
+        }
+
+        write!(vt, "\nUse the arrow keys to select the user that wants to unlock and press enter.").context(ErrorKind::Io)?;
+
+        while let Some(c) = input.next() {
+            match c.context(ErrorKind::Io)? {
+                Key::Up => {
+                    current_index = current_index.saturating_sub(1);
+                    continue 'outer;
+                },
+                Key::Down => {
+                    current_index = min(current_index + 1, users.len() - 1);
+                    continue 'outer;
+                },
+                Key::Char('\n') => {
+                    break 'outer;
+                }
+                _ => ()
+            }
+        }
+
+        return Err(ErrorKind::Message("Unexpected EOF.").into());
+
+    }
+
+    Ok(&users[current_index])
+
+}
 
 fn repaint_console<W: Write>(opt: &Opt, vt: &mut W, user: &str) -> Result<()> {
     
@@ -96,8 +153,8 @@ fn run() -> Result<i32> {
     // The auth loop
     let vt = lock.vt();
     let (mut reader, writer) = lock.get_reader_writer();
-    let user = &opt.users.first().unwrap()[..];
-    loop {
+    let mut user = opt.users.first().unwrap();
+    'outer: loop {
 
         // Flush the terminal buffers
         vt.borrow_mut().flush_buffers(VtFlushType::Both).context(ErrorKind::Io)?;
@@ -122,10 +179,14 @@ fn run() -> Result<i32> {
                         break;
                     },
                     Key::Ctrl('c') => {
-                        write!(writer,
-                               "{}<C-c>{}",
-                               termion::color::Fg(termion::color::LightGreen),
-                               termion::style::Reset).context(ErrorKind::Io)?;
+                        
+                        // Switch the screen back on before user selection
+                        if opt.dark {
+                            vt.borrow_mut().blank(false).context(ErrorKind::Io)?;
+                        }
+                        user = user_selection(&opt.users, user, writer, reader)?;
+                        continue 'outer;
+
                     },
                     _ => {}
                 }

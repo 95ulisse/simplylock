@@ -2,7 +2,9 @@ mod error;
 mod options;
 mod lock;
 mod auth;
+mod util;
 
+use std::cell::RefCell;
 use std::cmp::min;
 use std::io::{self, Write};
 use std::time::Duration;
@@ -12,14 +14,20 @@ use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{Uid, Gid, ForkResult, geteuid, setresuid, setresgid, setsid, fork};
 use vt::VtFlushType;
 use termion::event::Key;
+use termion::input::TermRead;
 use crate::error::*;
 use crate::options::Opt;
 
-fn user_selection<'a, W, R>(users: &'a [String], current_user: &'a String, vt: &mut W, input: &mut R) -> Result<&'a String>
+/// This is because a lower-numbered vt might be actually free, but systemd-logind is managing it,
+/// and we don't want to step on systemd, otherwise bad things will happen.
+/// We chose 13 as the lower limit because the user can manually switch up to vt number 12.
+/// On most systems, the maximum number of vts is 16 or 64, so this should not be a problem.
+const MIN_VT_NUMBER: i32 = 13;
+
+fn user_selection<'a, W, R>(users: &'a [String], current_user: &'a str, vt: &mut W, input: &mut R) -> Result<&'a String>
     where W: Write,
           R: Iterator<Item = io::Result<termion::event::Key>>
 {
-    
     let mut current_index = users.iter().position(|x| x == current_user).unwrap();
     'outer: loop {
 
@@ -34,13 +42,13 @@ fn user_selection<'a, W, R>(users: &'a [String], current_user: &'a String, vt: &
         for (i, u) in users.iter().enumerate() {
             if current_index == i {
                 write!(vt,
-                       "{}{}- {}{}\n\r",
+                       "{}{}=> {}{}\n\r",
                        termion::style::Bold,
                        termion::color::Fg(termion::color::LightBlue),
                        u,
                        termion::style::Reset).context(ErrorKind::Io)?;
             } else {
-                write!(vt, "- {}\n\r", u).context(ErrorKind::Io)?;
+                write!(vt, " - {}\n\r", u).context(ErrorKind::Io)?;
             }
         }
 
@@ -68,7 +76,6 @@ fn user_selection<'a, W, R>(users: &'a [String], current_user: &'a String, vt: &
     }
 
     Ok(&users[current_index])
-
 }
 
 fn repaint_console<W: Write>(opt: &Opt, vt: &mut W, user: &str) -> Result<()> {
@@ -141,18 +148,24 @@ fn run() -> Result<i32> {
     // Become session leader
     setsid().context(ErrorKind::Message("setsid"))?;
     
+    // We clear the environment to avoid any possible interaction with PAM modules
+    unsafe { nix::libc::clearenv(); }
+    
     // Open console
     let console = vt::Console::open().context(ErrorKind::Message("Cannot open console device file"))?;
     
     // Lock station
-    let mut lock = lock::Lock::with_options(&opt, &console)?;
-    
-    // We clear the environment to avoid any possible interaction with PAM modules
-    unsafe { nix::libc::clearenv(); }
+    let vt = Rc::new(RefCell::new(
+        console.new_vt_with_minimum_number(MIN_VT_NUMBER).context(ErrorKind::Message("Cannot allocate new terminal"))?
+    ));
+    let _lock = lock::Lock::with_options(&opt, &console, Rc::clone(&vt))?;
+
+    // Put the terminal in raw mode
+    vt.borrow_mut().raw().context(ErrorKind::Io)?;
+    let (reader, mut writer) = util::split_stream(Rc::clone(&vt));
+    let mut reader = reader.keys();
 
     // The auth loop
-    let vt = lock.vt();
-    let (mut reader, writer) = lock.get_reader_writer();
     let mut user = opt.users.first().unwrap();
     'outer: loop {
 
@@ -160,7 +173,7 @@ fn run() -> Result<i32> {
         vt.borrow_mut().flush_buffers(VtFlushType::Both).context(ErrorKind::Io)?;
 
         // Repaint the console
-        repaint_console(&opt, writer, user)?;
+        repaint_console(&opt, &mut writer, user)?;
 
         // Wait for enter to be pressed if not in quick mode.
         // If we are in quick mode, instead, jump directly to
@@ -184,7 +197,7 @@ fn run() -> Result<i32> {
                         if opt.dark {
                             vt.borrow_mut().blank(false).context(ErrorKind::Io)?;
                         }
-                        user = user_selection(&opt.users, user, writer, reader)?;
+                        user = user_selection(&opt.users, user, &mut writer, &mut reader)?;
                         continue 'outer;
 
                     },
@@ -198,7 +211,7 @@ fn run() -> Result<i32> {
             }
 
             // Repaint the console
-            repaint_console(&opt, writer, user)?;
+            repaint_console(&opt, &mut writer, user)?;
 
         } else {
             opt.quick = false;

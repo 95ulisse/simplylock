@@ -6,12 +6,14 @@ mod util;
 
 use std::cell::RefCell;
 use std::cmp::min;
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::{self, Write, Read};
+use std::os::unix::io::FromRawFd;
 use std::time::Duration;
 use std::rc::Rc;
 use failure::Fail;
 use nix::sys::wait::{WaitStatus, waitpid};
-use nix::unistd::{Uid, Gid, ForkResult, geteuid, setresuid, setresgid, setsid, fork};
+use nix::unistd::{Uid, Gid, ForkResult, geteuid, setresuid, setresgid, setsid, fork, close};
 use vt::VtFlushType;
 use termion::event::Key;
 use termion::input::TermRead;
@@ -119,17 +121,30 @@ fn run() -> Result<i32> {
         .and_then(|_| setresuid(Uid::from_raw(0), Uid::from_raw(0), Uid::from_raw(0)))
         .context(ErrorKind::Message("Cannot setresuid/setresgid root"))?;
 
+    // Create a pipe. This pipe will be used by the forked process to signal to the parent
+    // that the station has been locked and it can safely detach
+    let pipe = nix::unistd::pipe().context(ErrorKind::Message("Cannot create anonymous pipe"))?;
+
     // Now we fork and move to a new session so that we can be the
     // foreground process for the new terminal to be created
     match fork() {
         Ok(ForkResult::Parent { child, .. }) => {
             
-            // Wait for the child to terminate
+            // Close the parent clone of the write end of the pipe
+            let _ = close(pipe.1);
+
+            // Wait for the station to be completely locked, or wait until it is unlocked if `-D` is passed.
             if opt.no_detach {
                 match waitpid(Some(child), None).context(ErrorKind::Message("waitpid"))? {
                     WaitStatus::Exited(_, code) => return Ok(code),
                     WaitStatus::Signaled(_, sig, _) => return Ok(128 + (sig as i32)),
                     _ => return Ok(1)
+                }
+            } else {
+                let mut pipe_r = unsafe { File::from_raw_fd(pipe.0) };
+                let mut buf = [ 0u8 ];
+                while buf[0] != 0x42 {
+                    pipe_r.read_exact(&mut buf).context(ErrorKind::Io)?;
                 }
             }
 
@@ -144,6 +159,9 @@ fn run() -> Result<i32> {
             return Err(e.context(ErrorKind::Message("fork")).into());
         },
     }
+
+    // Close the reader end of the pipe
+    let _ = close(pipe.0);
 
     // Become session leader
     setsid().context(ErrorKind::Message("setsid"))?;
@@ -164,6 +182,10 @@ fn run() -> Result<i32> {
     vt.borrow_mut().raw().context(ErrorKind::Io)?;
     let (reader, mut writer) = util::split_stream(Rc::clone(&vt));
     let mut reader = reader.keys();
+
+    // Signal to the parent process that the station has been fully locked
+    let mut pipe_w = unsafe { File::from_raw_fd(pipe.1) };
+    pipe_w.write_all(&[ 0x42u8 ]).context(ErrorKind::Io)?;
 
     // The auth loop
     let mut user = opt.users.first().unwrap();
@@ -230,7 +252,7 @@ fn run() -> Result<i32> {
             vt.borrow_mut().blank(false).context(ErrorKind::Io)?;
         }
 
-        writeln!(writer, "\nAuthentication failed.").context(ErrorKind::Io)?;
+        write!(writer, "\nAuthentication failed.\n\r").context(ErrorKind::Io)?;
         ::std::thread::sleep(Duration::from_secs(3));
     }
 

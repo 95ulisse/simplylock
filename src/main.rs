@@ -253,11 +253,17 @@ fn main() {
                         _ => None
                     });
 
-                match (note, is_first) {
-                    (Some(n), _) => notes.push(n),
-                    (None, false) => eprintln!("  => {}", f),
-                    (None, true) => {
-                        eprintln!("Error: {}", f);
+                match note {
+                    Some(n) => notes.push(n),
+                    None => {
+                        if is_first {
+                            eprintln!("Error: {}", f);
+                        } else {
+                            eprintln!("  => {}", f)
+                        }
+                        if let Some(bt) = f.backtrace() {
+                            eprintln!("{}", bt);
+                        }
                         is_first = false;
                     }
                 }
